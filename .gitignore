@@ -1,0 +1,17 @@
+# Environnements virtuels
+.venv/
+venv/
+*/.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs & temporaires
+*.log
+.DS_Store
+
+# Autres dossiers à ignorer éventuellement
+.env

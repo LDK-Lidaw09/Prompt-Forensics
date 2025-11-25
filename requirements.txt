@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+cryptography
+requests
+python-multipart
+streamlit
+sentence-transformers
+torch
+rapidfuzz
+httpx>=0.28.1
+httpx
