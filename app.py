@@ -12,6 +12,7 @@ import json
 import difflib
 import hashlib
 import sqlite3
+import math
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -100,6 +101,193 @@ def semantic_similarity_embeddings(a: str, b: str) -> dict:
             "error": str(e),
         }
 
+def compute_replay_robustness(
+    outputs: List[str],
+    consistency_threshold: float = 0.8,
+    fidelity_threshold: float = 0.8,
+) -> dict:
+    """
+    Calcule deux scores de robustesse sur une série de replays texte:
+
+      - consistency_score : similarité moyenne entre TOUTES les paires de replays
+      - fidelity_score    : similarité moyenne des replays 2..N vs le replay 1 (référence)
+
+    + Stats supplémentaires:
+      - std (écart-type) des similarités
+      - count_above : nombre de similarités >= threshold
+
+    Retourne un dict du type:
+    {
+      "ok": bool,
+      "num_replays": int,
+      "embedding_model": str,
+      "error": str | None,
+      "consistency": {
+        "score": float,
+        "std": float,
+        "threshold": float,
+        "count_above": int,
+        "num_pairs": int,
+        "pairwise": [
+          {"i": int, "j": int, "raw_cosine": float, "similarity": float}, ...
+        ],
+      },
+      "fidelity": {
+        "reference_index": int,
+        "score": float,
+        "std": float,
+        "threshold": float,
+        "count_above": int,
+        "num_replays": int,   # nombre de replays comparés à la référence
+        "per_replay": [
+          {"index": int, "raw_cosine": float, "similarity": float}, ...
+        ],
+      },
+    }
+    """
+    cleaned = [(o or "").strip() for o in (outputs or []) if (o or "").strip()]
+    n = len(cleaned)
+
+    if n < 2:
+        return {
+            "ok": False,
+            "num_replays": n,
+            "embedding_model": EMBED_MODEL_NAME,
+            "error": "need_at_least_two_replays",
+            "consistency": {
+                "score": 0.0,
+                "std": 0.0,
+                "threshold": consistency_threshold,
+                "count_above": 0,
+                "num_pairs": 0,
+                "pairwise": [],
+            },
+            "fidelity": {
+                "reference_index": 0,
+                "score": 0.0,
+                "std": 0.0,
+                "threshold": fidelity_threshold,
+                "count_above": 0,
+                "num_replays": 0,
+                "per_replay": [],
+            },
+        }
+
+    try:
+        model = get_embedder()
+        emb_matrix = model.encode(cleaned, normalize_embeddings=True)
+        cos_mat = util.cos_sim(emb_matrix, emb_matrix)  # [n, n]
+
+        # ---------- CONSISTENCY ----------
+        pairwise_details = []
+        sims_consistency = []
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                v = cos_mat[i][j]
+                try:
+                    cos = float(v.item())
+                except Exception:
+                    cos = float(v)
+                sim_01 = (cos + 1.0) / 2.0  # [-1,1] → [0,1]
+                pairwise_details.append(
+                    {"i": i, "j": j, "raw_cosine": cos, "similarity": sim_01}
+                )
+                sims_consistency.append(sim_01)
+
+        num_pairs = len(sims_consistency)
+        consistency_score = sum(sims_consistency) / num_pairs if num_pairs > 0 else 0.0
+
+        if num_pairs > 1:
+            mean_c = consistency_score
+            var_c = sum((x - mean_c) ** 2 for x in sims_consistency) / num_pairs
+            std_c = math.sqrt(var_c)
+        else:
+            std_c = 0.0
+
+        consistency_count_above = sum(
+            1 for x in sims_consistency if x >= consistency_threshold
+        )
+
+        # ---------- FIDELITY ----------
+        ref_idx = 0
+        fidelity_details = []
+        sims_fidelity = []
+
+        for i in range(1, n):
+            v = cos_mat[ref_idx][i]
+            try:
+                cos = float(v.item())
+            except Exception:
+                cos = float(v)
+            sim_01 = (cos + 1.0) / 2.0
+            fidelity_details.append(
+                {"index": i, "raw_cosine": cos, "similarity": sim_01}
+            )
+            sims_fidelity.append(sim_01)
+
+        num_fid = len(sims_fidelity)
+        fidelity_score = sum(sims_fidelity) / num_fid if num_fid > 0 else 0.0
+
+        if num_fid > 1:
+            mean_f = fidelity_score
+            var_f = sum((x - mean_f) ** 2 for x in sims_fidelity) / num_fid
+            std_f = math.sqrt(var_f)
+        else:
+            std_f = 0.0
+
+        fidelity_count_above = sum(
+            1 for x in sims_fidelity if x >= fidelity_threshold
+        )
+
+        return {
+            "ok": True,
+            "num_replays": n,
+            "embedding_model": EMBED_MODEL_NAME,
+            "error": None,
+            "consistency": {
+                "score": consistency_score,
+                "std": std_c,
+                "threshold": consistency_threshold,
+                "count_above": consistency_count_above,
+                "num_pairs": num_pairs,
+                "pairwise": pairwise_details,
+            },
+            "fidelity": {
+                "reference_index": ref_idx,
+                "score": fidelity_score,
+                "std": std_f,
+                "threshold": fidelity_threshold,
+                "count_above": fidelity_count_above,
+                "num_replays": num_fid,
+                "per_replay": fidelity_details,
+            },
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "num_replays": n,
+            "embedding_model": EMBED_MODEL_NAME,
+            "error": str(e),
+            "consistency": {
+                "score": 0.0,
+                "std": 0.0,
+                "threshold": consistency_threshold,
+                "count_above": 0,
+                "num_pairs": 0,
+                "pairwise": [],
+            },
+            "fidelity": {
+                "reference_index": 0,
+                "score": 0.0,
+                "std": 0.0,
+                "threshold": fidelity_threshold,
+                "count_above": 0,
+                "num_replays": 0,
+                "per_replay": [],
+            },
+        }
+
 
 # Initialise DB de base
 dna_store.init_db()
@@ -112,6 +300,7 @@ def ensure_chatlogs_superset(db_path: str) -> None:
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     try:
+        # 1) Création si la table n'existe pas (avec TOUTES les colonnes modernes)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS chat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -126,10 +315,18 @@ def ensure_chatlogs_superset(db_path: str) -> None:
             attack_info TEXT,
             response_hash TEXT,
             dna TEXT,
-            dna_hash TEXT
+            dna_hash TEXT,
+            response_text TEXT,
+            verdict TEXT,
+            score REAL,
+            risk_types TEXT,
+            malicious_prompt_ids TEXT,
+            malicious_prompts TEXT,
+            judge_json TEXT
         );
         """)
-        # ajoute les colonnes manquantes le cas échéant
+
+        # 2) Ajout des colonnes manquantes sur une table existante
         cur.execute("PRAGMA table_info(chat_logs);")
         cols = {r[1] for r in cur.fetchall()}
         for col, ddl in [
@@ -137,11 +334,18 @@ def ensure_chatlogs_superset(db_path: str) -> None:
             ("prompt", "TEXT"), ("prompt_text", "TEXT"), ("output_text", "TEXT"),
             ("model_used", "TEXT"), ("attack_flag", "INTEGER"), ("attack_info", "TEXT"),
             ("response_hash", "TEXT"), ("dna", "TEXT"), ("dna_hash", "TEXT"),
+            ("response_text", "TEXT"),
+            ("verdict", "TEXT"),
+            ("score", "REAL"),
+            ("risk_types", "TEXT"),
+            ("malicious_prompt_ids", "TEXT"),
+            ("malicious_prompts", "TEXT"),
+            ("judge_json", "TEXT"),
         ]:
             if col not in cols:
                 cur.execute(f"ALTER TABLE chat_logs ADD COLUMN {col} {ddl};")
 
-        # backfill simple (uniquement si colonnes legacy présentes)
+        # 3) Backfill léger (comme tu le faisais déjà)
         cur.execute("PRAGMA table_info(chat_logs);")
         cols = {r[1] for r in cur.fetchall()}
         if {"prompt", "prompt_text", "created_at", "created_ts", "dna", "dna_hash"}.issubset(cols):
@@ -162,6 +366,7 @@ def ensure_chatlogs_superset(db_path: str) -> None:
         conn.commit()
     finally:
         conn.close()
+
 
 # appeler au chargement
 ensure_chatlogs_superset(DB_PATH)

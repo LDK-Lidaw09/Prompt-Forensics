@@ -1498,6 +1498,148 @@ if page == "Chat & Replays":
                                 file_name=f"bulk_replay_{(selected_dna or compute_dna(prompt_to_replay))[:8]}.csv",
                                 mime="text/csv",
                             )
+                            # ---------- Replay robustness (10x same model) ----------
+        st.markdown("---")
+        st.markdown("## 🧱 Replay robustness (10× same model)")
+        st.caption(
+            "Run the selected DNA 10 times on the chosen model, then compute two scores:\n"
+            "- Consistency: average similarity across all replay pairs.\n"
+            "- Fidelity: average similarity of replays 2..10 vs replay #1."
+        )
+
+        # 🔹 Slider threshold (envoyé AU BACKEND)
+        threshold = st.slider(
+            "Threshold for high similarity (applied to both scores in backend)",
+            0.0, 1.0, 0.9, 0.01,
+            key="robustness_threshold",
+        )
+
+        robustness_btn = st.button("▶️ Run 10× Replay Robustness")
+
+        if robustness_btn:
+            prompt_to_replay = get_prompt_by_dna(selected_dna) if selected_dna else inline_prompt
+            if not prompt_to_replay:
+                st.warning("Select a DNA first (top of this tab) or choose an entry with prompt.")
+            else:
+                # Inject output-language hint for robustness replays
+                lang_label = st.session_state.get("ui_lang_label", "French")
+                prompt_to_replay = f"{prompt_to_replay}\n\n[Output language: {lang_label}]"
+
+                model_id_for_call = replay_full_model or DEFAULT_LIVE
+                st.info(f"Running 10 replays on model: `{model_id_for_call}` …")
+
+                base_params = {
+                    "agent": "live",
+                    "temperature": float(ui_temperature),
+                    "max_tokens": int(ui_max_tokens),
+                    "system": "You are a careful assistant.",
+                }
+                safe_params = strip_system_if_lmstudio(model_id_for_call, base_params)
+
+                all_outputs = []
+                all_timings = []
+
+                for i in range(10):
+                    t0 = time.time()
+                    llm_out = app_core.call_llm(prompt_to_replay, model_id_for_call, safe_params)
+                    wall_ms = int((time.time() - t0) * 1000)
+                    all_timings.append(wall_ms)
+
+                    resp = (llm_out.get("text") or "").strip()
+                    all_outputs.append(resp)
+
+                # On garde les 10 replays en session si besoin d’inspecter plus tard
+                st.session_state["last_robustness_outputs"] = all_outputs
+                st.session_state["last_robustness_model"] = model_id_for_call
+
+                # 🔹 Appel backend AVEC thresholds
+                metrics = app_core.compute_replay_robustness(
+                    all_outputs,
+                    consistency_threshold=threshold,
+                    fidelity_threshold=threshold,
+                )
+
+                if not metrics.get("ok"):
+                    st.error(f"Robustness computation failed: {metrics.get('error') or 'unknown error'}")
+                else:
+                    cons_block = metrics.get("consistency", {}) or {}
+                    fid_block = metrics.get("fidelity", {}) or {}
+
+                    cons = float(cons_block.get("score", 0.0) or 0.0)
+                    fid = float(fid_block.get("score", 0.0) or 0.0)
+                    n_replays = int(metrics.get("num_replays") or len(all_outputs))
+                    avg_time = sum(all_timings) / len(all_timings) if all_timings else 0.0
+
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.metric(
+                            "Consistency score",
+                            f"{cons:.3f}",
+                            help="Average similarity across all replay pairs."
+                        )
+                    with c2:
+                        st.metric(
+                            "Fidelity score",
+                            f"{fid:.3f}",
+                            help="Average similarity of replays 2..N vs replay #1."
+                        )
+                    with c3:
+                        st.metric("Avg wall-time per replay (ms)", f"{avg_time:.0f}")
+
+                    # 🔹 Détails : mean/std/count/ratio (déjà calculés côté backend)
+                    st.markdown("### 📊 Detailed robustness stats")
+
+                    with st.expander("Consistency details", expanded=False):
+                        cc1, cc2, cc3, cc4 = st.columns(4)
+                        cc1.metric("Mean", f"{cons_block.get('score', 0.0):.3f}")
+                        cc2.metric("Std", f"{cons_block.get('std', 0.0):.3f}")
+                        cc3.metric(
+                            f"Count ≥ {threshold:.2f}",
+                            f"{cons_block.get('count_above', 0)}/{cons_block.get('num_pairs', 0)}",
+                        )
+                        ratio_c = (
+                            cons_block.get("count_above", 0) / cons_block.get("num_pairs", 1)
+                            if cons_block.get("num_pairs", 0) > 0 else 0.0
+                        )
+                        cc4.metric(
+                            "Ratio ≥ threshold",
+                            f"{ratio_c * 100:.1f} %",
+                        )
+
+                    with st.expander("Fidelity details", expanded=False):
+                        ff1, ff2, ff3, ff4 = st.columns(4)
+                        ff1.metric("Mean", f"{fid_block.get('score', 0.0):.3f}")
+                        ff2.metric("Std", f"{fid_block.get('std', 0.0):.3f}")
+                        ff3.metric(
+                            f"Count ≥ {threshold:.2f}",
+                            f"{fid_block.get('count_above', 0)}/{fid_block.get('num_replays', 0)}",
+                        )
+                        ratio_f = (
+                            fid_block.get("count_above", 0) / fid_block.get("num_replays", 1)
+                            if fid_block.get("num_replays", 0) > 0 else 0.0
+                        )
+                        ff4.metric(
+                            "Ratio ≥ threshold",
+                            f"{ratio_f * 100:.1f} %",
+                        )
+
+                    # Interprétation rapide
+                    if cons >= 0.9 and fid >= 0.9:
+                        st.success("🟢 Replays are highly consistent and faithful to the reference.")
+                    elif cons >= 0.7 and fid >= 0.7:
+                        st.warning("🟡 Moderate robustness — worth manual inspection.")
+                    else:
+                        st.error("🔴 Low robustness — strong variability or drift across replays.")
+
+                    with st.expander("🔍 Detailed robustness JSON"):
+                        st.json(metrics)
+
+                    # Aperçu des 10 sorties
+                    with st.expander("📜 All 10 replay outputs (raw)"):
+                        for idx, txt in enumerate(all_outputs):
+                            st.markdown(f"**Replay #{idx+1}**")
+                            st.code((txt or "")[:4000])
+                            st.markdown("---")
 
 else:
     # ----------------------------

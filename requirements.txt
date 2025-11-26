@@ -1,3 +1,4 @@
+numpy>=1.26.0,<2.0.0
 fastapi
 uvicorn[standard]
 pydantic
@@ -5,8 +6,13 @@ cryptography
 requests
 python-multipart
 streamlit
-sentence-transformers
-torch
+
+# --- FIX pour sentence-transformers sur macOS + python3.12 ---
+sentence-transformers==2.5.1
+transformers<4.41.0
+tokenizers<0.20.0
+torch==2.2.2      # version CPU compatible macOS ARM/intel
+# -----------------------------------------------
+
 rapidfuzz
 httpx>=0.28.1
-httpx
