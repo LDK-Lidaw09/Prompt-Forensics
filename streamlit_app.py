@@ -1308,38 +1308,101 @@ if page == "Chat & Replays":
                     except Exception as e:
                         st.error(f"Judge evaluation failed: {e}")
 
-                    # ---------- Judge v2 : auto-détection du prompt malicieux ----------
-                    st.info("Running LLM-as-judge v2 (auto-detect malicious prompts)…")
+                                    # ---------- Judge v2 : auto-détection du prompt malicieux ----------
+                st.info("Running LLM-as-judge v2 (auto-detect malicious prompts)…")
 
-                    try:
-                        judge_prompts = []
-                        if safe_prompt:
-                            judge_prompts.append(
-                                {"id": "safe_candidate", "role": "user", "text": safe_prompt}
-                            )
-                        if adversary_prompt:
-                            judge_prompts.append(
-                                {"id": "attack_candidate", "role": "user", "text": adversary_prompt}
-                            )
-
-                        judge_v2 = app_core.judge_response_v2(
-                            prompts=judge_prompts,
-                            live_output=last_replay,
-                            audit_model=os.getenv("SELF_AUDIT_MODEL", DEFAULT_SELF_AUDIT),
+                try:
+                    judge_prompts = []
+                    if safe_prompt:
+                        judge_prompts.append(
+                            {"id": "safe_candidate", "role": "user", "text": safe_prompt}
+                        )
+                    if adversary_prompt:
+                        judge_prompts.append(
+                            {"id": "attack_candidate", "role": "user", "text": adversary_prompt}
                         )
 
-                        core_v2 = (
-                            judge_v2.get("json") if isinstance(judge_v2.get("json"), dict) else judge_v2
+                    judge_v2 = app_core.judge_response_v2(
+                        prompts=judge_prompts,
+                        live_output=last_replay,
+                        audit_model=os.getenv("SELF_AUDIT_MODEL", DEFAULT_SELF_AUDIT),
+                    )
+
+                    core_v2 = (
+                        judge_v2.get("json")
+                        if isinstance(judge_v2.get("json"), dict)
+                        else judge_v2
+                    ) or {}
+
+                    st.markdown("## 🕵️‍♂️ Judge v2 – Malicious prompt detection")
+
+                    if not core_v2:
+                        st.info("No judge output available.")
+                    else:
+                        # 1) Modèle utilisé en tant que juge
+                        judge_model = core_v2.get("judge_model") or os.getenv(
+                            "SELF_AUDIT_MODEL", DEFAULT_SELF_AUDIT
                         )
+                        if judge_model:
+                            st.markdown(f"**Judge model:** `{judge_model}`")
 
-                        st.markdown("## 🕵️‍♂️ Judge v2 – Malicious prompt detection")
-                        st.json(core_v2)
+                        # 2) Verdict + score
+                        verdict = core_v2.get("verdict", "unknown")
+                        score = core_v2.get("score", 0.0)
 
-                        with st.expander("Judge v2 raw / debug"):
-                            st.json(judge_v2)
+                        cols = st.columns(2)
+                        with cols[0]:
+                            st.markdown(f"**Verdict:** `{verdict}`")
+                        with cols[1]:
+                            try:
+                                st.markdown(f"**Score:** `{float(score):.3f}`")
+                            except Exception:
+                                st.markdown(f"**Score:** `{score}`")
 
-                    except Exception as e:
-                        st.error(f"Judge v2 evaluation failed: {e}")
+                        # 3) Risk types
+                        risk_types = core_v2.get("risk_types") or []
+                        if risk_types:
+                            st.markdown(
+                                "**Risk types:** "
+                                + ", ".join(f"`{r}`" for r in risk_types)
+                            )
+
+                        # 4) Prompts malicieux / suspects
+                        malicious_prompts = [
+                            p for p in (core_v2.get("malicious_prompts") or []) if p
+                        ]
+                        if malicious_prompts:
+                            with st.expander("💥 Malicious / risky prompts detected"):
+                                for i, mp in enumerate(malicious_prompts, start=1):
+                                    st.markdown(f"**Prompt {i}:**")
+                                    st.code(mp, language="text")
+                        else:
+                            st.caption(
+                                "No explicit malicious_prompt detected "
+                                "(or judge considered prompts safe)."
+                            )
+
+                        # 5) Tous les prompts analysés (optionnel mais utile pour le rapport)
+                        input_prompts = core_v2.get("input_prompts") or []
+                        if input_prompts:
+                            with st.expander("🔎 All analyzed prompts"):
+                                for p in input_prompts:
+                                    st.markdown(
+                                        f"- `{p.get('id')}` ({p.get('role','user')}):"
+                                    )
+                                    st.code(p.get("text", ""), language="text")
+
+                        # 6) JSON “nettoyé” du judge pour le rapport
+                        with st.expander("🧾 Judge v2 JSON"):
+                            st.json(core_v2)
+
+                    # Et on garde la structure complète (ok/json/raw_text) pour le debug bas niveau
+                    with st.expander("Judge v2 raw / debug"):
+                        st.json(judge_v2)
+
+                except Exception as e:
+                    st.error(f"Judge v2 evaluation failed: {e}")
+
 
 
             # ---------- Bulk replay (inchangé) ----------

@@ -1181,15 +1181,42 @@ def judge_response_v2(
         if not isinstance(obj, dict):
             obj = {}
 
-        verdict = obj.get("verdict") or "unknown"
+        # --- verdict normalisé ---
+        verdict = (obj.get("verdict") or "unknown").strip()
         if verdict not in {"safe", "suspicious", "malicious", "unknown"}:
             verdict = "unknown"
 
+        # --- score avec fallback en fonction du verdict ---
+        raw_score = obj.get("score", None)
         try:
-            score = float(obj.get("score", 0.5) or 0.5)
+            if raw_score is not None:
+                # le modèle a explicitement renvoyé un score
+                score = float(raw_score)
+            else:
+                # fallback “maliciousness” selon les guidelines
+                if verdict == "safe":
+                    score = 0.2
+                elif verdict == "suspicious":
+                    score = 0.5
+                elif verdict == "malicious":
+                    score = 0.8
+                else:  # unknown
+                    score = 0.5
         except Exception:
-            score = 0.5
+            # en cas de valeur non parseable, même fallback
+            if verdict == "safe":
+                score = 0.2
+            elif verdict == "suspicious":
+                score = 0.5
+            elif verdict == "malicious":
+                score = 0.8
+            else:
+                score = 0.5
 
+        # On borne le score dans [0,1] au cas où
+        score = max(0.0, min(1.0, score))
+
+        # --- reste inchangé ---
         issues = obj.get("issues") or []
         if not isinstance(issues, list):
             issues = [str(issues)]
@@ -1221,7 +1248,8 @@ def judge_response_v2(
             "malicious_prompt_ids": mal_ids,
             "malicious_prompts": [],  # rempli après parsing
             "analysis_summary": summary,
-        }
+    }
+
 
     # ---------- Parsing JSON robuste ----------
     raw_text = text.strip()
@@ -1237,6 +1265,16 @@ def judge_response_v2(
         except Exception:
             parsed = None
 
+    # Prépare aussi la liste des prompts analysés (utile même en cas d'erreur)
+    input_prompts = [
+        {
+            "id": (p.get("id") or f"p{i}"),
+            "role": p.get("role", "user"),
+            "text": p.get("text", ""),
+        }
+        for i, p in enumerate(prompts, start=1)
+    ]
+
     if parsed is None:
         # ---------- Fallback en cas d'échec de parsing ----------
         return {
@@ -1249,6 +1287,8 @@ def judge_response_v2(
                 "malicious_prompt_ids": [],
                 "malicious_prompts": [],
                 "analysis_summary": "",
+                "judge_model": model,
+                "input_prompts": input_prompts,
             },
             "raw_text": text,
         }
@@ -1271,8 +1311,15 @@ def judge_response_v2(
         id_to_text[f"p{i}"] = txt                # ex: "p1"
 
     # ⚠️ Fallback : si le modèle ne fournit aucun malicious_prompt_ids
-    # mais que le verdict n'est PAS "safe", on infère nous-mêmes
-    if not coerced["malicious_prompt_ids"] and coerced["verdict"] in {"suspicious", "malicious"}:
+    # mais que le verdict n'est PAS "safe" OU qu'il signale des risk_types,
+    # on infère qu'au moins les prompts user sont suspects.
+    if (
+        not coerced["malicious_prompt_ids"]
+        and (
+            coerced["verdict"] in {"suspicious", "malicious"}
+            or coerced["risk_types"]
+        )
+    ):
         user_ids: List[str] = []
         for i, p in enumerate(prompts, start=1):
             if p.get("role", "user") == "user":
@@ -1297,6 +1344,10 @@ def judge_response_v2(
         exact_malicious_prompts.append(txt or "")
 
     coerced["malicious_prompts"] = exact_malicious_prompts
+
+    # 🔹 Ajout d'infos de traçabilité pour le rapport
+    coerced["judge_model"] = model
+    coerced["input_prompts"] = input_prompts
 
     return {"ok": True, "json": coerced, "raw_text": text}
 
