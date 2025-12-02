@@ -13,6 +13,9 @@ import streamlit.components.v1 as components
 import hashlib
 import base64
 import difflib
+import pandas as pd
+import run_scenarios  # Automatisation script
+import analyze_metrics
 
 # optional .env
 try:
@@ -1770,7 +1773,91 @@ if page == "Chat & Replays":
                                 st.markdown(f"**Replay #{idx+1}**")
                                 st.code((txt or "")[:4000])
                                 st.markdown("---")
+            # =========================================
+            # 📊 Scenario-based judge evaluation
+            # =========================================
+            st.markdown("---")
+            st.header("📊 Scenario-based judge evaluation")
 
+            st.caption(
+                "Run your LLM-as-judge models on the attack scenarios dataset "
+                "(belief elicitation, data leakage, jailbreak, etc.) and export results as CSV."
+            )
+
+            # Mapping joli label -> clé interne attack_type
+            attack_display_to_key = {
+                "All attacks (full dataset)": None,
+                "Belief Elicitation": "belief_elicitation",
+                "Data leakage": "data_leakage",
+                "Deceptive delight": "deceptive_delight",
+                "Jailbreak": "jailbreak",
+                "Prompt injection": "prompt_injection",
+                "Reverse psychology": "reverse_psychology",
+            }
+
+            attack_choice = st.selectbox(
+                "Attack type to run",
+                list(attack_display_to_key.keys()),
+                index=0,
+            )
+
+            attack_filter = attack_display_to_key[attack_choice]
+
+            max_scenarios = st.slider(
+                "Max number of scenarios",
+                min_value=10,
+                max_value=240,
+                value=40,
+                step=10,
+                help="For quick tests, start with 10–40. Full run = 240 (all attacks).",
+            )
+
+            run_btn = st.button("▶️ Run judge evaluation on scenarios")
+
+            if run_btn:
+                with st.spinner("Running scenario evaluation… this may take a while ⏳"):
+                    # 1) Lancer le pipeline d'évaluation
+                    csv_path = run_scenarios.main(
+                        attack_filter=attack_filter,
+                        limit=max_scenarios,
+                    )
+
+                if not csv_path:
+                    st.error("No CSV produced. Check logs / terminal for errors.")
+                else:
+                    st.success(f"Evaluation finished. Results written to: {csv_path}")
+
+                    # 2) Aperçu rapide du CSV brut
+                    try:
+                        df_preview = pd.read_csv(csv_path)
+                        st.markdown("#### Preview of raw results")
+                        st.dataframe(df_preview.head(20))
+                    except Exception as e:
+                        st.warning(f"Could not load CSV preview: {e}")
+
+                    # 3) Calcul des métriques (F1 / precision / recall / accuracy)
+                    try:
+                        metrics_attack, metrics_global = analyze_metrics.analyze(csv_path, save_prefix=None)
+
+                        st.markdown("### 📈 Global metrics per judge")
+                        st.dataframe(metrics_global)
+
+                        st.markdown("### 🎯 Metrics per judge & attack type")
+                        st.dataframe(metrics_attack)
+                    except Exception as e:
+                        st.warning(f"Could not compute metrics: {e}")
+
+                    # 4) Bouton de téléchargement du CSV brut
+                    try:
+                        with open(csv_path, "rb") as f:
+                            st.download_button(
+                                label="⬇️ Download raw results CSV",
+                                data=f,
+                                file_name=os.path.basename(csv_path),
+                                mime="text/csv",
+                            )
+                    except Exception as e:
+                        st.warning(f"Could not open CSV for download: {e}")
 
 else:
     # ----------------------------
