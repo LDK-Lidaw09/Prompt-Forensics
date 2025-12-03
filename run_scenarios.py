@@ -58,6 +58,24 @@ TARGET_PARAMS = {
 
 # ---------- UTILITAIRES ----------
 
+def normalize_attack_type(value: str | None) -> str:
+    """
+    Normalise un type d'attaque pour comparaison :
+      - string -> lower
+      - trim
+      - espaces & tirets -> underscores
+    """
+    if not value:
+        return ""
+    return (
+        str(value)
+        .strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+
 def load_scenarios(files: List[str]) -> List[Dict[str, Any]]:
     """Charge et concatène tous les scénarios depuis les fichiers JSON."""
     all_scenarios: List[Dict[str, Any]] = []
@@ -169,8 +187,7 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
     Lance l'évaluation automatique.
 
     :param attack_filter: si non nul, ne garde que les scénarios dont
-                          s["attack_type"] == attack_filter.
-                          (ex: "belief_elicitation", "data_leakage", etc.)
+                          s["attack_type"] matche ce filtre (normalisé).
     :param limit: si non nul, ne garde que les `limit` premiers scénarios après filtrage.
 
     :return: chemin du fichier CSV généré.
@@ -185,9 +202,30 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
 
     # --- Filtre par type d'attaque (optionnel) ---
     if attack_filter:
+        norm_filter = normalize_attack_type(attack_filter)
         before = len(scenarios)
-        scenarios = [s for s in scenarios if s.get("attack_type") == attack_filter]
-        print(f"[INFO] Filter attack_type='{attack_filter}': {before} → {len(scenarios)} scenarios.")
+
+        kept: List[Dict[str, Any]] = []
+        for s in scenarios:
+            norm_att = normalize_attack_type(s.get("attack_type", ""))
+            # match strict OU inclus (ex: "prompt_injection" dans "prompt_injection_attack")
+            if norm_filter == norm_att or norm_filter in norm_att:
+                kept.append(s)
+
+        scenarios = kept
+        print(
+            f"[INFO] Filter attack_type='{attack_filter}' "
+            f"(normalized='{norm_filter}'): {before} → {len(scenarios)} scenarios."
+        )
+
+        # Petit debug si on se retrouve encore à 0
+        if len(scenarios) == 0:
+            unique_types = sorted({
+                normalize_attack_type(s.get("attack_type", "")) or "<EMPTY>"
+                for s in load_scenarios(SCENARIO_FILES)
+            })
+            print("[WARN] No scenarios matched this filter.")
+            print(f"[WARN] Normalized attack_type values found in dataset: {unique_types}")
 
     # --- Limite le nombre de scénarios (optionnel) ---
     if limit is not None and limit > 0:
@@ -249,7 +287,6 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
                 continue
 
             live_output = llm_res.get("text", "") or ""
-            # (optionnel) tu peux logguer llm_res["raw"] si tu veux les timings / tokens
 
             # 2) Construire les prompts pour le juge
             judge_prompts = build_judge_prompts(s)

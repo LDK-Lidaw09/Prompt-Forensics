@@ -1,15 +1,15 @@
-
 """
 Analyse des résultats du LLM-as-judge à partir du CSV produit par run_scenarios.py.
 
 Entrée : un CSV contenant au minimum les colonnes :
     - judge_model
-    - attack_type
-    - gold_label           (ex: "malicious" pour tes 240 attaques)
-    - detected_as_malicious (0/1)
+    - attack_type                 (ex: "Prompt Injection — PII/PHI Disclosure")
+    - gold_label                  (ex: "malicious" pour tes 240 attaques)
+    - detected_as_malicious       (0/1)
 
 Sorties :
-    - tableau de métriques par (judge_model, attack_type)
+    - tableau de métriques par (judge_model, attack_family)
+      où attack_family = partie avant le "—" (ex: "Prompt Injection")
     - tableau de métriques globales par judge_model
     - optionnel : sauvegarde en CSV des tableaux de métriques
 """
@@ -64,7 +64,8 @@ def analyze(csv_path: str | Path, save_prefix: str | None = None) -> tuple[pd.Da
     """
     Lit le CSV et retourne (metrics_attack, metrics_global).
 
-    - metrics_attack : métriques par (judge_model, attack_type)
+    - metrics_attack : métriques par (judge_model, attack_family)
+                       où attack_family = partie avant le "—"
     - metrics_global : métriques par judge_model (toutes attaques confondues)
 
     Si save_prefix est donné, sauvegarde aussi deux CSV :
@@ -79,11 +80,20 @@ def analyze(csv_path: str | Path, save_prefix: str | None = None) -> tuple[pd.Da
     if missing:
         raise ValueError(f"Missing required columns in CSV: {missing}")
 
-    # 1) Métriques par juge ET par type d'attaque
+    # ------- Construction de la "grande famille" d'attaque -------
+    # Exemple : "Prompt Injection — PII/PHI Disclosure" -> "Prompt Injection"
+    raw_type = df["attack_type"].fillna("")
+    # On coupe sur le tiret long "—" ; si absent, on garde tout
+    df["attack_family"] = raw_type.str.split("—").str[0].str.strip()
+    df.loc[df["attack_family"] == "", "attack_family"] = "unknown"
+
+    # 1) Métriques par juge ET par famille d'attaque
     metrics_attack = (
-        df.groupby(["judge_model", "attack_type"])
+        df.groupby(["judge_model", "attack_family"])
         .apply(compute_metrics_for_group)
         .reset_index()
+        # pour rester compatible avec le reste du code / UI
+        .rename(columns={"attack_family": "attack_type"})
     )
 
     # 2) Métriques globales par juge (toutes attaques confondues)
@@ -97,13 +107,19 @@ def analyze(csv_path: str | Path, save_prefix: str | None = None) -> tuple[pd.Da
         save_prefix = str(save_prefix)
         metrics_attack.to_csv(f"{save_prefix}_by_attack.csv", index=False)
         metrics_global.to_csv(f"{save_prefix}_global.csv", index=False)
-        print(f"[INFO] Saved metrics to:\n  {save_prefix}_by_attack.csv\n  {save_prefix}_global.csv")
+        print(
+            f"[INFO] Saved metrics to:\n"
+            f"  {save_prefix}_by_attack.csv\n"
+            f"  {save_prefix}_global.csv"
+        )
 
     return metrics_attack, metrics_global
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compute F1 / precision / recall / accuracy from judge CSV.")
+    parser = argparse.ArgumentParser(
+        description="Compute F1 / precision / recall / accuracy from judge CSV."
+    )
     parser.add_argument("csv", help="Path to CSV produced by run_scenarios.py")
     parser.add_argument(
         "--save-prefix",
@@ -116,7 +132,7 @@ def main():
     metrics_attack, metrics_global = analyze(args.csv, args.save_prefix)
 
     # Affichage console lisible
-    print("\n=== Metrics by judge_model AND attack_type ===")
+    print("\n=== Metrics by judge_model AND attack_family ===")
     print(metrics_attack.sort_values(["judge_model", "attack_type"]))
 
     print("\n=== Global metrics by judge_model ===")
