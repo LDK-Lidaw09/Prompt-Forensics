@@ -8,10 +8,10 @@ Entrée : un CSV contenant au minimum les colonnes :
     - detected_as_malicious       (0/1)
 
 Sorties :
-    - tableau de métriques par (judge_model, attack_family)
-      où attack_family = partie avant le "—" (ex: "Prompt Injection")
-    - tableau de métriques globales par judge_model
-    - optionnel : sauvegarde en CSV des tableaux de métriques
+    - metrics_attack : 1 ligne par judge_model, avec une colonne attack_type
+      (la "famille" d'attaque, ex: "Prompt Injection", "Belief Elicitation")
+    - metrics_global : métriques globales par judge_model (identiques ici,
+      mais pratique si un jour tu mixes plusieurs familles).
 """
 
 from __future__ import annotations
@@ -23,11 +23,7 @@ import pandas as pd
 
 
 def compute_metrics_for_group(sub: pd.DataFrame) -> pd.Series:
-    """
-    Calcule TP / FP / FN / TN + precision / recall / f1 / accuracy
-    pour un sous-ensemble de lignes (un groupe).
-    """
-    # Vrai label : 1 = malicious, 0 = non-malicious
+    """Calcule TP / FP / FN / TN + precision / recall / f1 / accuracy pour un groupe."""
     y_true = (sub["gold_label"] == "malicious").astype(int)
     y_pred = sub["detected_as_malicious"].astype(int)
 
@@ -38,11 +34,7 @@ def compute_metrics_for_group(sub: pd.DataFrame) -> pd.Series:
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     accuracy = (tp + tn) / len(sub) if len(sub) > 0 else 0.0
 
     return pd.Series(
@@ -64,13 +56,9 @@ def analyze(csv_path: str | Path, save_prefix: str | None = None) -> tuple[pd.Da
     """
     Lit le CSV et retourne (metrics_attack, metrics_global).
 
-    - metrics_attack : métriques par (judge_model, attack_family)
-                       où attack_family = partie avant le "—"
-    - metrics_global : métriques par judge_model (toutes attaques confondues)
-
-    Si save_prefix est donné, sauvegarde aussi deux CSV :
-        f"{save_prefix}_by_attack.csv"
-        f"{save_prefix}_global.csv"
+    - metrics_attack : 1 ligne par judge_model, avec attack_type = famille d'attaque
+                       (ex: "Belief Elicitation", "Prompt Injection")
+    - metrics_global : métriques globales par judge_model
     """
     csv_path = Path(csv_path)
     df = pd.read_csv(csv_path)
@@ -80,23 +68,29 @@ def analyze(csv_path: str | Path, save_prefix: str | None = None) -> tuple[pd.Da
     if missing:
         raise ValueError(f"Missing required columns in CSV: {missing}")
 
-    # ------- Construction de la "grande famille" d'attaque -------
-    # Exemple : "Prompt Injection — PII/PHI Disclosure" -> "Prompt Injection"
+    # ---- Construire la "famille" d'attaque (partie avant le '—') ----
     raw_type = df["attack_type"].fillna("")
-    # On coupe sur le tiret long "—" ; si absent, on garde tout
-    df["attack_family"] = raw_type.str.split("—").str[0].str.strip()
-    df.loc[df["attack_family"] == "", "attack_family"] = "unknown"
+    attack_family = raw_type.str.split("—").str[0].str.strip()
+    attack_family = attack_family.replace("", "unknown")
 
-    # 1) Métriques par juge ET par famille d'attaque
+    # Pour ce run, on prend une seule étiquette de famille (normalement un seul type filtré)
+    unique_families = attack_family.unique()
+    if len(unique_families) == 1:
+        family_label = unique_families[0]
+    else:
+        # Si tu lances un run "All attacks", on met un label générique
+        family_label = "mixed_attacks"
+
+    # 1) Métriques par juge (c'est ton "Judge_results_with_attacks")
     metrics_attack = (
-        df.groupby(["judge_model", "attack_family"])
+        df.groupby(["judge_model"])
         .apply(compute_metrics_for_group)
         .reset_index()
-        # pour rester compatible avec le reste du code / UI
-        .rename(columns={"attack_family": "attack_type"})
     )
+    # on insère la colonne attack_type juste après judge_model
+    metrics_attack.insert(1, "attack_type", family_label)
 
-    # 2) Métriques globales par juge (toutes attaques confondues)
+    # 2) Métriques globales par juge (identiques tant que tu ne mixes pas les familles)
     metrics_global = (
         df.groupby(["judge_model"])
         .apply(compute_metrics_for_group)
@@ -131,9 +125,8 @@ def main():
 
     metrics_attack, metrics_global = analyze(args.csv, args.save_prefix)
 
-    # Affichage console lisible
-    print("\n=== Metrics by judge_model AND attack_family ===")
-    print(metrics_attack.sort_values(["judge_model", "attack_type"]))
+    print("\n=== Metrics by judge_model (with attack_type label) ===")
+    print(metrics_attack.sort_values(["judge_model"]))
 
     print("\n=== Global metrics by judge_model ===")
     print(metrics_global.sort_values("judge_model"))
