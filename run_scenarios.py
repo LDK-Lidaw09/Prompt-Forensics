@@ -5,17 +5,21 @@ Pipeline pour CHAQUE scénario :
   1) Construire le prompt complet pour le modèle "victime" (live model).
   2) Appeler app.call_llm(...) pour obtenir live_output.
   3) Appeler app.judge_response_v2(...) avec :
-       - prompts = [system_prompt?, attack_prompt]
+       - prompts = [system_prompt?, <attack_prompt ou safe_prompt>]
        - live_output = sortie du modèle victime
-       - audit_model = modèle juge (phi, mistral, llama, qwen, gpt-oss, ...)
+       - audit_model = modèle juge (phi, mistral, llama, qwen, ...)
   4) Loguer les résultats dans un CSV.
 
-Tous les scénarios chargés ici sont considérés comme "malicious" par construction.
+Tous les scénarios sont décrits dans ./scenarios/**, avec :
+  - system_prompt
+  - dataset
+  - attack_prompt  (prompt malveillant)
+  - safe_prompt    (prompt bénin, optionnel)
 
 NOUVEAU :
   - Scanne automatiquement tous les fichiers JSON dans ./scenarios/**.
-  - Possibilité de filtrer par type d'attaque (attack_filter) et de limiter le
-    nombre de scénarios (limit) pour des runs "step by step".
+  - Possibilité de filtrer par type d'attaque (attack_filter).
+  - Paramètre run_mode: "attacks" (par défaut) ou "safe".
 """
 
 from __future__ import annotations
@@ -101,14 +105,26 @@ def load_scenarios(files: List[str]) -> List[Dict[str, Any]]:
     return all_scenarios
 
 
-def build_live_prompt(s: Dict[str, Any]) -> str:
+def _pick_main_prompt(s: Dict[str, Any], run_mode: str) -> str:
+    """
+    Choisit le prompt principal selon le mode :
+      - 'attacks' -> attack_prompt
+      - 'safe'    -> safe_prompt
+    """
+    if run_mode == "safe":
+        return s.get("safe_prompt") or ""
+    # défaut: attaques
+    return s.get("attack_prompt") or s.get("prompt") or ""
+
+
+def build_live_prompt(s: Dict[str, Any], run_mode: str = "attacks") -> str:
     """
     Construit le prompt texte envoyé au modèle "victime" pour ce scénario.
 
     On concatène typiquement :
       - system_prompt (rôle / consignes),
       - dataset / case_info / data_snippet / context,
-      - attack_prompt (la vraie attaque du scénario).
+      - attack_prompt OU safe_prompt (selon run_mode).
     """
     parts: List[str] = []
 
@@ -123,26 +139,26 @@ def build_live_prompt(s: Dict[str, Any]) -> str:
             parts.append(str(s[k]))
             break
 
-    attack_prompt = s.get("attack_prompt") or s.get("prompt") or ""
-    if attack_prompt:
-        parts.append(attack_prompt)
+    main_prompt = _pick_main_prompt(s, run_mode)
+    if main_prompt:
+        parts.append(main_prompt)
 
     prompt_text = "\n\n".join(parts).strip()
     return prompt_text
 
 
-def build_judge_prompts(s: Dict[str, Any]) -> List[Dict[str, Any]]:
+def build_judge_prompts(s: Dict[str, Any], run_mode: str = "attacks") -> List[Dict[str, Any]]:
     """
     Construit la liste des prompts envoyés au LLM-as-judge.
 
-    On lui donne au minimum le attack_prompt, avec l'id du scénario.
+    On lui donne au minimum le prompt principal (attack ou safe), avec l'id du scénario.
     On peut aussi lui fournir le system_prompt comme prompt "safe".
     """
     prompts: List[Dict[str, Any]] = []
 
-    scenario_id = s.get("id") or s.get("scenario_id") or "scenario"
+    scenario_id = s.get("id") or s.get("scenario_id") or s.get("scenario_id".lower()) or "scenario"
     system_prompt = s.get("system_prompt") or ""
-    attack_prompt = s.get("attack_prompt") or s.get("prompt") or ""
+    main_prompt = _pick_main_prompt(s, run_mode)
 
     if system_prompt:
         prompts.append(
@@ -153,12 +169,12 @@ def build_judge_prompts(s: Dict[str, Any]) -> List[Dict[str, Any]]:
             }
         )
 
-    if attack_prompt:
+    if main_prompt:
         prompts.append(
             {
                 "id": scenario_id,
                 "role": "user",
-                "text": attack_prompt,
+                "text": main_prompt,
             }
         )
 
@@ -182,18 +198,28 @@ def is_detected_malicious(judge_json: Dict[str, Any]) -> bool:
 
 # ---------- BOUCLE PRINCIPALE ----------
 
-def main(attack_filter: str | None = None, limit: int | None = None) -> str:
+def main(
+    attack_filter: str | None = None,
+    limit: int | None = None,
+    run_mode: str = "attacks",  # "attacks" ou "safe"
+) -> str:
     """
     Lance l'évaluation automatique.
 
     :param attack_filter: si non nul, ne garde que les scénarios dont
                           s["attack_type"] matche ce filtre (normalisé).
     :param limit: si non nul, ne garde que les `limit` premiers scénarios après filtrage.
+    :param run_mode: "attacks" (prompts malveillants, gold_label='malicious')
+                     ou "safe" (safe_prompt, gold_label='benign').
 
     :return: chemin du fichier CSV généré.
     """
+    if run_mode not in {"attacks", "safe"}:
+        raise ValueError(f"Invalid run_mode: {run_mode}. Expected 'attacks' or 'safe'.")
+
     print(f"[INFO] Using TARGET_MODEL (victim): {TARGET_MODEL}")
     print(f"[INFO] Judge models: {', '.join(JUDGE_MODELS)}")
+    print(f"[INFO] Run mode: {run_mode}")
 
     scenarios = load_scenarios(SCENARIO_FILES)
     if not scenarios:
@@ -218,7 +244,6 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
             f"(normalized='{norm_filter}'): {before} → {len(scenarios)} scenarios."
         )
 
-        # Petit debug si on se retrouve encore à 0
         if len(scenarios) == 0:
             unique_types = sorted({
                 normalize_attack_type(s.get("attack_type", "")) or "<EMPTY>"
@@ -237,7 +262,8 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
         return ""
 
     # CSV de sortie : timestamp généré à CHAQUE run
-    output_csv = f"judge_eval_replay_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    suffix = "attacks" if run_mode == "attacks" else "safe"
+    output_csv = f"judge_eval_replay_{suffix}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
 
     fieldnames = [
         "scenario_id",
@@ -254,10 +280,13 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
         "malicious_prompt_ids",
         "num_malicious_prompts",
         "detected_as_malicious",  # 1 si le juge "voit" l'attaque
-        "gold_label",             # ici toujours 'malicious'
+        "gold_label",             # 'malicious' ou 'benign'
+        "run_mode",               # 'attacks' ou 'safe'
         "analysis_summary",
         "live_output",
     ]
+
+    gold_label_value = "malicious" if run_mode == "attacks" else "benign"
 
     with open(output_csv, "w", encoding="utf-8", newline="") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=fieldnames)
@@ -267,13 +296,13 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
             scenario_id = s.get("id") or s.get("scenario_id") or "unknown_id"
             domain = s.get("domain", "")
             attack_type = s.get("attack_type", "")
-            scenario_name = s.get("scenario_name", "")
+            scenario_name = s.get("scenario_name", "") or s.get("title", "")
             source_file = s.get("source_file", "")
 
             # 1) Générer la sortie du modèle "victime" (replay)
-            live_prompt = build_live_prompt(s)
+            live_prompt = build_live_prompt(s, run_mode=run_mode)
             if not live_prompt:
-                print(f"[WARN] Scenario {scenario_id} has empty prompt, skipping.")
+                print(f"[WARN] Scenario {scenario_id} has empty main prompt for run_mode={run_mode}, skipping.")
                 continue
 
             try:
@@ -289,7 +318,7 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
             live_output = llm_res.get("text", "") or ""
 
             # 2) Construire les prompts pour le juge
-            judge_prompts = build_judge_prompts(s)
+            judge_prompts = build_judge_prompts(s, run_mode=run_mode)
 
             # 3) Pour chaque modèle JUGE, appeler judge_response_v2
             for judge_model in JUDGE_MODELS:
@@ -313,7 +342,6 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
                 analysis_summary = judge_json.get("analysis_summary", "")
 
                 detected = int(is_detected_malicious(judge_json))  # 1 ou 0
-                gold_label = "malicious"  # tous ces scénarios sont des attaques
 
                 row = {
                     "scenario_id": scenario_id,
@@ -330,7 +358,8 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
                     "malicious_prompt_ids": "|".join(map(str, mal_ids)),
                     "num_malicious_prompts": len([p for p in mal_prompts if p]),
                     "detected_as_malicious": detected,
-                    "gold_label": gold_label,
+                    "gold_label": gold_label_value,
+                    "run_mode": run_mode,
                     "analysis_summary": analysis_summary,
                     "live_output": live_output,
                 }
@@ -341,5 +370,5 @@ def main(attack_filter: str | None = None, limit: int | None = None) -> str:
 
 
 if __name__ == "__main__":
-    # Run complet (toutes attaques, tous scénarios)
+    # Run complet (toutes attaques, tous scénarios) par défaut
     main()

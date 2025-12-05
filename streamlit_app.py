@@ -1780,11 +1780,25 @@ if page == "Chat & Replays":
             st.header("📊 Scenario-based judge evaluation")
 
             st.caption(
-                "Run your LLM-as-judge models on the attack scenarios dataset "
+                "Run your LLM-as-judge models on the scenario dataset "
                 "(belief elicitation, data leakage, jailbreak, etc.) and export results as CSV."
             )
 
-            # Mapping joli label -> clé interne attack_type
+            # --- 1) Choix : attaques vs safe prompts -------------------------
+            prompt_mode_label = st.radio(
+                "Prompt type to evaluate",
+                [
+                    "Attacks (malicious prompts)",
+                    "Safe prompts (benign / policy-respecting)",
+                ],
+                index=0,
+                horizontal=True,
+            )
+
+            # run_mode utilisé par run_scenarios.main(...)
+            run_mode = "attacks" if prompt_mode_label.startswith("Attacks") else "safe"
+
+            # --- 2) Choix de la famille d'attaque (pour filtrer les scénarios) ---
             attack_display_to_key = {
                 "All attacks (full dataset)": None,
                 "Belief Elicitation": "belief_elicitation",
@@ -1796,7 +1810,7 @@ if page == "Chat & Replays":
             }
 
             attack_choice = st.selectbox(
-                "Attack type to run",
+                "Attack type / family to run (used to filter scenarios)",
                 list(attack_display_to_key.keys()),
                 index=0,
             )
@@ -1809,7 +1823,7 @@ if page == "Chat & Replays":
                 max_value=240,
                 value=40,
                 step=10,
-                help="For quick tests, start with 10–40. Full run = 240 (all attacks).",
+                help="For quick tests, start with 10–40. Full run = 240.",
             )
 
             run_btn = st.button("▶️ Run judge evaluation on scenarios")
@@ -1820,6 +1834,7 @@ if page == "Chat & Replays":
                     csv_path = run_scenarios.main(
                         attack_filter=attack_filter,
                         limit=max_scenarios,
+                        run_mode=run_mode,        # ⬅️ IMPORTANT : attaques ou safe
                     )
 
                 if not csv_path:
@@ -1835,11 +1850,15 @@ if page == "Chat & Replays":
                     except Exception as e:
                         st.warning(f"Could not load CSV preview: {e}")
 
-                    # 3) Calcul des métriques (F1 / precision / recall / accuracy)
+                    # 3) Calcul des métrriques (F1 / precision / recall / accuracy)
                     try:
-                        metrics_attack, metrics_global = analyze_metrics.analyze(csv_path, save_prefix=None)
+                        metrics_attack, metrics_global = analyze_metrics.analyze(
+                            csv_path,
+                            save_prefix=None,
+                        )
 
-                        st.markdown("### 📈 Global metrics per judge")
+                        # petit rappel visuel du mode
+                        st.markdown(f"### 📈 Global metrics per judge  \n*Run mode: `{run_mode}`*")
                         st.dataframe(metrics_global)
 
                         st.markdown("### 🎯 Metrics per judge & attack type")
@@ -1858,6 +1877,8 @@ if page == "Chat & Replays":
                             )
                     except Exception as e:
                         st.warning(f"Could not open CSV for download: {e}")
+
+
 
 else:
     # ----------------------------
