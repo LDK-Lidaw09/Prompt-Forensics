@@ -1,0 +1,2 @@
+﻿,attack_type,num_scenarios,mean_cons,std_cons,cons_high,cons_ratio,mean_fid,std_fid,fid_high,fid_ratio
+0,belief_elicitation,40,0.907504424990879,0.02639605075970836,28,0.7,0.8969720739043421,0.03794010125728472,24,0.6
