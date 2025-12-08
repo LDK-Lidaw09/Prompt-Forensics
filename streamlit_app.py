@@ -16,6 +16,7 @@ import difflib
 import pandas as pd
 import run_scenarios  # Automatisation script
 import analyze_metrics
+import run_replay_dataset 
 
 # optional .env
 try:
@@ -1878,6 +1879,184 @@ if page == "Chat & Replays":
                     except Exception as e:
                         st.warning(f"Could not open CSV for download: {e}")
 
+            # ================================
+            # 🧱 Dataset replay robustness
+            # ================================
+            st.markdown("---")
+            st.header("🧱 Dataset replay robustness (10× per scenario)")
+
+            st.caption(
+                "Run multiple replays per scenario (attacks or safe prompts) and aggregate "
+                "robustness scores (consistency / fidelity) per attack type."
+            )
+
+            # 🔹 Choix prompts: attacks vs safe
+            mode_label = st.radio(
+                "Prompt type to replay",
+                ["Attack prompts (attack_prompt)", "Safe prompts (safe_prompt)"],
+                index=0,
+                horizontal=True,
+            )
+            run_mode = "attacks" if mode_label.startswith("Attack") else "safe"
+
+            # 🔹 Sélecteur type d'attaque (même mapping que plus haut)
+            attack_choice_replay = st.selectbox(
+                "Attack family to include in dataset replay",
+                list(attack_display_to_key.keys()),
+                index=0,
+                key="replay_attack_choice",
+            )
+            attack_filter_replay = attack_display_to_key[attack_choice_replay]
+
+            max_scenarios_replay = st.slider(
+                "Max number of scenarios for replay robustness",
+                min_value=10,
+                max_value=240,
+                value=40,
+                step=10,
+                help="For quick tests, start with 10–40. Full dataset = 240 (all attacks).",
+                key="replay_max_scenarios",
+            )
+
+            num_replays = st.slider(
+                "Number of replays per scenario",
+                min_value=3,
+                max_value=20,
+                value=10,
+                step=1,
+                key="replay_num_replays",
+            )
+
+            threshold_dataset = st.slider(
+                "Threshold for high similarity (used for count / ratio)",
+                0.0, 1.0, 0.90, 0.01,
+                key="replay_dataset_threshold",
+            )
+
+            run_replay_btn = st.button("▶️ Run dataset replay robustness")
+
+            if run_replay_btn:
+                with st.spinner("Running dataset replay robustness… this may take a while ⏳"):
+                    csv_path = run_replay_dataset.run_replay_dataset(
+                        run_mode=run_mode,
+                        attack_filter=attack_filter_replay,
+                        limit=max_scenarios_replay,
+                        num_replays=num_replays,
+                        consistency_threshold=threshold_dataset,
+                        fidelity_threshold=threshold_dataset,
+                    )
+
+                if not csv_path:
+                    st.error("No CSV produced. Check backend logs for errors.")
+                else:
+                    st.success(f"Replay robustness finished. Results written to: {csv_path}")
+
+                    import pandas as pd
+
+                    try:
+                        df_replay = pd.read_csv(csv_path)
+                    except Exception as e:
+                        st.error(f"Could not load replay CSV: {e}")
+                    else:
+                        st.markdown("### 📄 Raw per-scenario replay robustness")
+                        st.dataframe(df_replay.head(50))
+
+                        # Colonnes auxiliaires pour ratio scénarios ≥ threshold
+                        df_replay["cons_high"] = df_replay["cons_score"] >= threshold_dataset
+                        df_replay["fid_high"] = df_replay["fid_score"] >= threshold_dataset
+
+                        n_scen = len(df_replay)
+
+                        # ---------- Stats globales (tous scénarios confondus) ----------
+                        mean_cons = df_replay["cons_score"].mean()
+                        std_cons = df_replay["cons_score"].std(ddof=0)
+                        cons_high = int(df_replay["cons_high"].sum())
+                        cons_ratio = cons_high / n_scen if n_scen > 0 else 0.0
+
+                        mean_fid = df_replay["fid_score"].mean()
+                        std_fid = df_replay["fid_score"].std(ddof=0)
+                        fid_high = int(df_replay["fid_high"].sum())
+                        fid_ratio = fid_high / n_scen if n_scen > 0 else 0.0
+
+                        st.markdown("### 📊 Global replay robustness over dataset")
+                        st.markdown(f"_Run mode_: `{run_mode}`  •  _#scenarios_: **{n_scen}**")
+
+                        # Bloc "Consistency details" façon screenshot
+                        with st.expander("Consistency details", expanded=True):
+                            c1, c2, c3, c4 = st.columns(4)
+                            c1.metric("Mean", f"{mean_cons:.3f}")
+                            c2.metric("Std", f"{std_cons:.3f}")
+                            c3.metric(
+                                f"Count ≥ {threshold_dataset:.2f}",
+                                f"{cons_high}/{n_scen}",
+                            )
+                            c4.metric("Ratio ≥ threshold", f"{cons_ratio*100:.1f} %")
+
+                        # Bloc "Fidelity details" façon screenshot
+                        with st.expander("Fidelity details", expanded=True):
+                            f1c, f2c, f3c, f4c = st.columns(4)
+                            f1c.metric("Mean", f"{mean_fid:.3f}")
+                            f2c.metric("Std", f"{std_fid:.3f}")
+                            f3c.metric(
+                                f"Count ≥ {threshold_dataset:.2f}",
+                                f"{fid_high}/{n_scen}",
+                            )
+                            f4c.metric("Ratio ≥ threshold", f"{fid_ratio*100:.1f} %")
+
+                        # ---------- Stats par type d’attaque ----------
+                        st.markdown("### 🎯 Replay robustness per attack type")
+
+                        # pour les attaques: on garde le "family name" normalisé
+                        df_replay["attack_type_norm"] = df_replay["attack_type"].fillna("unknown")
+
+                        agg = (
+                            df_replay
+                            .groupby("attack_type_norm")
+                            .agg(
+                                num_scenarios=("scenario_id", "nunique"),
+                                mean_cons=("cons_score", "mean"),
+                                std_cons=("cons_score", "std"),
+                                cons_high=("cons_high", "sum"),
+                                mean_fid=("fid_score", "mean"),
+                                std_fid=("fid_score", "std"),
+                                fid_high=("fid_high", "sum"),
+                            )
+                            .reset_index()
+                        )
+
+                        agg["cons_ratio"] = agg["cons_high"] / agg["num_scenarios"]
+                        agg["fid_ratio"] = agg["fid_high"] / agg["num_scenarios"]
+
+                        agg = agg.rename(columns={"attack_type_norm": "attack_type"})
+
+                        st.dataframe(
+                            agg[
+                                [
+                                    "attack_type",
+                                    "num_scenarios",
+                                    "mean_cons",
+                                    "std_cons",
+                                    "cons_high",
+                                    "cons_ratio",
+                                    "mean_fid",
+                                    "std_fid",
+                                    "fid_high",
+                                    "fid_ratio",
+                                ]
+                            ]
+                        )
+
+                        # Bouton de download du CSV
+                        try:
+                            with open(csv_path, "rb") as f:
+                                st.download_button(
+                                    label="⬇️ Download replay robustness CSV",
+                                    data=f,
+                                    file_name=os.path.basename(csv_path),
+                                    mime="text/csv",
+                                )
+                        except Exception as e:
+                            st.warning(f"Could not open CSV for download: {e}")
 
 
 else:
