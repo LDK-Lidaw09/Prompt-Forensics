@@ -1,0 +1,5 @@
+﻿,judge_model,attack_type,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+0,lmstudio:llama-2-7b-chat,mixed_attacks,40,1,0,39,0,1,0.025,0.04878048780487806,0.025
+1,lmstudio:mistral-7b-instruct-v0.3,mixed_attacks,40,1,0,39,0,1,0.025,0.04878048780487806,0.025
+2,lmstudio:phi-3-mini-4k-instruct,mixed_attacks,40,29,0,11,0,1,0.725,0.8405797101449275,0.725
+3,lmstudio:qwen/qwen3-vl-4b,mixed_attacks,40,39,0,1,0,1,0.975,0.9873417721518987,0.975

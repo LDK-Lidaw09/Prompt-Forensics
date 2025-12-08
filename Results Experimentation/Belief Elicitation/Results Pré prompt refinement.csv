@@ -1,0 +1,5 @@
+﻿,judge_model,attack_type,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+0,lmstudio:llama-2-7b-chat,belief_elicitation,40,37,0,3,0,1,0.925,0.961038961038961,0.925
+1,lmstudio:mistral-7b-instruct-v0.3,belief_elicitation,40,37,0,3,0,1,0.925,0.961038961038961,0.925
+2,lmstudio:phi-3-mini-4k-instruct,belief_elicitation,40,33,0,7,0,1,0.825,0.9041095890410958,0.825
+3,lmstudio:qwen/qwen3-vl-4b,belief_elicitation,40,25,0,15,0,1,0.625,0.7692307692307693,0.625

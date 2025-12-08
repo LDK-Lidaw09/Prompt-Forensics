@@ -1,0 +1,5 @@
+﻿,judge_model,attack_type,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+0,lmstudio:llama-2-7b-chat,jailbreak,40,0,0,0,40,0,0,0,1
+1,lmstudio:mistral-7b-instruct-v0.3,jailbreak,40,0,0,0,40,0,0,0,1
+2,lmstudio:phi-3-mini-4k-instruct,jailbreak,40,0,18,0,22,0,0,0,0.55
+3,lmstudio:qwen/qwen3-vl-4b,jailbreak,40,0,16,0,24,0,0,0,0.6

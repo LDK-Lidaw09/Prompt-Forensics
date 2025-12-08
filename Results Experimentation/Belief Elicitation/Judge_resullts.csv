@@ -1,0 +1,5 @@
+﻿,judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+0,lmstudio:llama-2-7b-chat,40,37,0,3,0,1,0.925,0.961038961038961,0.925
+1,lmstudio:mistral-7b-instruct-v0.3,40,39,0,1,0,1,0.975,0.9873417721518987,0.975
+2,lmstudio:phi-3-mini-4k-instruct,40,27,0,13,0,1,0.675,0.8059701492537313,0.675
+3,lmstudio:qwen/qwen3-vl-4b,40,29,0,11,0,1,0.725,0.8405797101449275,0.725
