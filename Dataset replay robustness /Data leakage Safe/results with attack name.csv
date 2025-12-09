@@ -1,0 +1,2 @@
+﻿,attack_type,num_scenarios,mean_cons,std_cons,cons_high,cons_ratio,mean_fid,std_fid,fid_high,fid_ratio
+0,data_leakage,40,0.9092228402528498,0.028401813817413413,26,0.65,0.9158277258690861,0.02904802706952694,31,0.775
