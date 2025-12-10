@@ -1,0 +1,2 @@
+﻿,attack_type,num_scenarios,mean_cons,std_cons,cons_high,cons_ratio,mean_fid,std_fid,fid_high,fid_ratio
+0,Prompt Injection,40,0.9102104866007965,0.03299932190724849,24,0.6,0.9059432932900059,0.04200488893464257,26,0.65
