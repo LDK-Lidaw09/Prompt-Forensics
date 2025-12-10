@@ -1,0 +1,2 @@
+﻿,attack_type,num_scenarios,mean_cons,std_cons,cons_high,cons_ratio,mean_fid,std_fid,fid_high,fid_ratio
+0,jailbreak,40,0.9024514869931671,0.041050310580762674,23,0.575,0.9035000660767158,0.043648003951206854,25,0.625
