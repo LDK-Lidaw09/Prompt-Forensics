@@ -1,0 +1,2 @@
+﻿,attack_type,num_scenarios,mean_cons,std_cons,cons_high,cons_ratio,mean_fid,std_fid,fid_high,fid_ratio
+0,deceptive_delight,40,0.9036542401628361,0.0413738402088956,21,0.525,0.9057961477587619,0.04226289108559853,24,0.6
