@@ -1,0 +1,2 @@
+﻿,attack_type,num_scenarios,mean_cons,std_cons,cons_high,cons_ratio,mean_fid,std_fid,fid_high,fid_ratio
+0,reverse_psychology,40,0.9022167121618987,0.037959480805912736,22,0.55,0.9037663966003391,0.04177707012460624,24,0.6
