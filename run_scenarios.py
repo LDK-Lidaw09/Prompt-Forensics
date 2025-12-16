@@ -46,6 +46,7 @@ JUDGE_MODELS = [
     "lmstudio:mistral-7b-instruct-v0.3",
     "lmstudio:llama-2-7b-chat",
     "lmstudio:qwen/qwen3-vl-4b",
+    "lmstudio:google/gemma-3-4b",
 ]
 
 # Modèle "victime" (celui qu'on attaque et dont on juge la réponse)
