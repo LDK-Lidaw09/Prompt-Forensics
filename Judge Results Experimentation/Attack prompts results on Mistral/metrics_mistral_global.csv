@@ -1,0 +1,2 @@
+judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+lmstudio:mistralai/Mistral-7B-Instruct-v0.3,600.0,584.0,0.0,16.0,0.0,1.0,0.9733333333333334,0.9864864864864865,0.9733333333333334
