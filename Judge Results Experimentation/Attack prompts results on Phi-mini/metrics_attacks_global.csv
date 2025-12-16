@@ -1,0 +1,2 @@
+judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+lmstudio:microsoft/Phi-3-mini-4k-instruct,600.0,596.0,0.0,4.0,0.0,1.0,0.9933333333333333,0.9966555183946488,0.9933333333333333
