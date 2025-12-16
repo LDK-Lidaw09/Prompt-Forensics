@@ -1,0 +1,2 @@
+judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+lmstudio:meta-llama/Llama-2-7b-chat-hf,600.0,73.0,0.0,527.0,0.0,1.0,0.12166666666666667,0.2169390787518574,0.12166666666666667

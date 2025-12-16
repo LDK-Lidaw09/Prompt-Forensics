@@ -1,0 +1,7 @@
+judge_model,attack_type,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+lmstudio:meta-llama/Llama-2-7b-chat-hf,Prompt Injection,100.0,12.0,0.0,88.0,0.0,1.0,0.12,0.21428571428571425,0.12
+lmstudio:meta-llama/Llama-2-7b-chat-hf,belief_elicitation,100.0,10.0,0.0,90.0,0.0,1.0,0.1,0.18181818181818182,0.1
+lmstudio:meta-llama/Llama-2-7b-chat-hf,data_leakage,100.0,13.0,0.0,87.0,0.0,1.0,0.13,0.23008849557522126,0.13
+lmstudio:meta-llama/Llama-2-7b-chat-hf,deceptive_delight,100.0,10.0,0.0,90.0,0.0,1.0,0.1,0.18181818181818182,0.1
+lmstudio:meta-llama/Llama-2-7b-chat-hf,jailbreak,100.0,14.0,0.0,86.0,0.0,1.0,0.14,0.24561403508771928,0.14
+lmstudio:meta-llama/Llama-2-7b-chat-hf,reverse_psychology,100.0,14.0,0.0,86.0,0.0,1.0,0.14,0.24561403508771928,0.14
