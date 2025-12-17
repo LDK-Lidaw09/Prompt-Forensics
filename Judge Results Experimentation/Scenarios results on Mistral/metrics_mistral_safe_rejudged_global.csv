@@ -1,0 +1,2 @@
+judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+mistralai/Mistral-7B-Instruct-v0.3,600.0,0.0,116.0,0.0,484.0,0.0,0.0,0.0,0.8066666666666666
