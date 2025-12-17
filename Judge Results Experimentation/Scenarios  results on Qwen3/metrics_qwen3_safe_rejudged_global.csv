@@ -1,0 +1,2 @@
+judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+Qwen/Qwen3-4B-Instruct-2507,600.0,0.0,2.0,0.0,598.0,0.0,0.0,0.0,0.9966666666666667
