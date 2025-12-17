@@ -1,2 +1,0 @@
-judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
-lmstudio:google/gemma-3-4b-it,600.0,0.0,389.0,0.0,211.0,0.0,0.0,0.0,0.3516666666666667

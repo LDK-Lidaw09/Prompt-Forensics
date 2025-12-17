@@ -1,0 +1,2 @@
+judge_model,n,tp,fp,fn,tn,precision,recall,f1,accuracy
+google/gemma-3-4b-it,600.0,0.0,78.0,0.0,522.0,0.0,0.0,0.0,0.87
