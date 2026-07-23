@@ -17,6 +17,7 @@ import pandas as pd
 import run_scenarios  # Automatisation script
 import analyze_metrics
 import run_replay_dataset 
+import judge_as_evaluator
 
 # optional .env
 try:
@@ -649,7 +650,7 @@ if page == "Chat & Replays":
 
                     c1, c2, c3, c4 = st.columns([2,1,1,2])
                     with c1:
-                        st.markdown("### 🔗 Prompt DNA")
+                        st.markdown("### 🔗 Prompt HASH")
                         st.code(out.get("dna", "N/A"))
                     with c2:
                         st.markdown("### 🧾 Response Hash")
@@ -1937,7 +1938,7 @@ if page == "Chat & Replays":
 
             if run_replay_btn:
                 with st.spinner("Running dataset replay robustness… this may take a while ⏳"):
-                    csv_path = run_replay_dataset.run_replay_dataset(
+                    csv_path, jsonl_path = run_replay_dataset.run_replay_dataset(
                         run_mode=run_mode,
                         attack_filter=attack_filter_replay,
                         limit=max_scenarios_replay,
@@ -1946,10 +1947,11 @@ if page == "Chat & Replays":
                         fidelity_threshold=threshold_dataset,
                     )
 
-                if not csv_path:
-                    st.error("No CSV produced. Check backend logs for errors.")
-                else:
-                    st.success(f"Replay robustness finished. Results written to: {csv_path}")
+                    if not csv_path:
+                        st.error("No CSV produced. Check backend logs for errors.")
+                    else:
+                        st.success(f"Replay robustness finished. Results written to: {csv_path}")
+                        st.caption(f"Replay outputs JSONL: {jsonl_path}")
 
                     import pandas as pd
 
@@ -2057,6 +2059,225 @@ if page == "Chat & Replays":
                                 )
                         except Exception as e:
                             st.warning(f"Could not open CSV for download: {e}")
+            # =========================================
+            # ⚖️ Judge as evaluator (grouped by scenario_id)
+            # =========================================
+            st.markdown("---")
+            st.header("⚖️ Judge as evaluator")
+
+            st.caption(
+                "Upload replay files (.jsonl, .json, .csv, .txt). "
+                "Records are grouped by scenario_id, then each scenario is evaluated across its replays. "
+                "The evaluator computes both exact robustness metrics and LLM-judged fidelity/consistency."
+            )
+
+            judge_model_candidates = [DEFAULT_SELF_AUDIT]
+            try:
+                local_judge_models = lmstudio_models() if lmstudio_ok() else []
+                for m in local_judge_models:
+                    full_mid = make_full_model_id(m, use_cloud=False)
+                    if full_mid not in judge_model_candidates:
+                        judge_model_candidates.append(full_mid)
+            except Exception:
+                pass
+
+            uploaded_judge_model = st.selectbox(
+                "Judge model to use",
+                options=judge_model_candidates,
+                index=0,
+                key="judge_as_evaluator_model_grouped",
+            )
+
+            judge_eval_threshold = st.slider(
+                "Similarity threshold for grouped evaluation",
+                0.0, 1.0, 0.90, 0.01,
+                key="judge_as_evaluator_threshold_grouped",
+            )
+
+            uploaded_files = st.file_uploader(
+                "Drag & drop replay files to evaluate",
+                type=["jsonl", "json", "csv", "txt"],
+                accept_multiple_files=True,
+                key="judge_as_evaluator_files_grouped",
+            )
+
+            run_uploaded_judge_btn = st.button(
+                "▶️ Run grouped judge evaluator",
+                key="judge_as_evaluator_run_btn_grouped",
+            )
+
+            if run_uploaded_judge_btn:
+                if not uploaded_files:
+                    st.warning("Upload at least one replay file.")
+                else:
+                    extracted_records = judge_as_evaluator.extract_uploaded_outputs(uploaded_files)
+
+                    if not extracted_records:
+                        st.warning("No valid replay records were extracted from the uploaded files.")
+                    else:
+                        with st.spinner("Evaluating replay groups by scenario_id… ⏳"):
+                            robustness_metrics, replay_df_all, summary = (
+                                judge_as_evaluator.evaluate_uploaded_outputs_with_judge(
+                                    extracted_records,
+                                    judge_model=uploaded_judge_model,
+                                    threshold=judge_eval_threshold,
+                                )
+                            )
+
+                        if not robustness_metrics.get("ok"):
+                            st.error(robustness_metrics.get("error") or "Grouped evaluation failed.")
+                        else:
+                            st.success("Grouped replay evaluation finished ✅")
+
+                            scenario_df = pd.DataFrame(robustness_metrics.get("per_scenario", []) or [])
+
+                            # -------------------------------------------------
+                            # Global overview
+                            # -------------------------------------------------
+                            st.markdown("### 📊 Global overview")
+
+                            c1, c2, c3, c4 = st.columns(4)
+                            c1.metric("Scenario groups", int(summary.get("scenario_count", 0)))
+                            c2.metric("Replay comparisons", int(summary.get("num_compared", 0)))
+                            c3.metric("Safety regressions", int(summary.get("safety_regression_count", 0)))
+                            c4.metric("Meaning changed", int(summary.get("meaning_changed_count", 0)))
+
+                            # -------------------------------------------------
+                            # Exact robustness metrics (aggregated)
+                            # -------------------------------------------------
+                            cons_block = robustness_metrics.get("consistency", {}) or {}
+                            fid_block = robustness_metrics.get("fidelity", {}) or {}
+                            cons_bert_block = robustness_metrics.get("consistency_bert", {}) or {}
+                            fid_bert_block = robustness_metrics.get("fidelity_bert", {}) or {}
+                            llm_group_block = robustness_metrics.get("llm_group_scores", {}) or {}
+
+                            st.markdown("### 🧱 Exact robustness metrics (aggregated across scenarios)")
+
+                            e1, e2, e3, e4 = st.columns(4)
+                            e1.metric("Consistency (embeddings)", f"{float(cons_block.get('score', 0.0)):.3f}")
+                            e2.metric("Fidelity (embeddings)", f"{float(fid_block.get('score', 0.0)):.3f}")
+                            e3.metric("Consistency (BERT F1)", f"{float(cons_bert_block.get('score', 0.0)):.3f}")
+                            e4.metric("Fidelity (BERT F1)", f"{float(fid_bert_block.get('score', 0.0)):.3f}")
+
+                            # -------------------------------------------------
+                            # LLM evaluator scores (aggregated)
+                            # -------------------------------------------------
+                            st.markdown("### 🧠 LLM evaluator scores (aggregated across scenarios)")
+
+                            l1, l2, l3, l4 = st.columns(4)
+                            l1.metric("LLM fidelity score", f"{float(llm_group_block.get('fidelity_score_mean', 0.0)):.3f}")
+                            l2.metric("LLM consistency score", f"{float(llm_group_block.get('consistency_score_mean', 0.0)):.3f}")
+                            l3.metric("High robustness", int(llm_group_block.get("high_robustness_count", 0)))
+                            l4.metric("Moderate robustness", int(llm_group_block.get("moderate_robustness_count", 0)))
+
+                            l5, l6, l7 = st.columns(3)
+                            l5.metric("Low robustness", int(llm_group_block.get("low_robustness_count", 0)))
+                            l6.metric("Judge semantic mean", f"{float(summary.get('judge_semantic_mean', 0.0)):.3f}")
+                            l7.metric("Judge hybrid mean", f"{float(summary.get('judge_hybrid_mean', 0.0)):.3f}")
+
+                            l8, l9 = st.columns(2)
+                            l8.metric("Judge BERT mean", f"{float(summary.get('judge_bertscore_mean', 0.0)):.3f}")
+                            l9.metric("Judge model", uploaded_judge_model)
+
+                            # -------------------------------------------------
+                            # Scenario-level table
+                            # -------------------------------------------------
+                            st.markdown("### 📄 Scenario-level evaluation")
+
+                            if not scenario_df.empty:
+                                scenario_display_cols = [
+                                    "scenario_id",
+                                    "num_replays",
+                                    "exact_consistency_score",
+                                    "exact_fidelity_score",
+                                    "exact_consistency_bert_score",
+                                    "exact_fidelity_bert_score",
+                                    "llm_fidelity_score",
+                                    "llm_consistency_score",
+                                    "llm_verdict",
+                                    "llm_meaning_changed",
+                                    "llm_factual_drift",
+                                    "llm_safety_regression",
+                                    "llm_changed_aspects",
+                                    "judge_semantic_mean",
+                                    "judge_hybrid_mean",
+                                    "judge_bertscore_mean",
+                                    "safety_regression_count",
+                                    "meaning_changed_count",
+                                    "safe_count",
+                                    "suspicious_count",
+                                    "malicious_count",
+                                    "unknown_count",
+                                ]
+                                scenario_display_cols = [c for c in scenario_display_cols if c in scenario_df.columns]
+
+                                st.dataframe(
+                                    scenario_df[scenario_display_cols],
+                                    use_container_width=True,
+                                )
+
+                                csv_buf_scen = io.StringIO()
+                                scenario_df.to_csv(csv_buf_scen, index=False)
+                                st.download_button(
+                                    "⬇️ Download scenario-level CSV",
+                                    data=csv_buf_scen.getvalue().encode("utf-8"),
+                                    file_name=f"judge_grouped_scenarios_{int(time.time())}.csv",
+                                    mime="text/csv",
+                                )
+                            else:
+                                st.info("No scenario-level rows generated.")
+
+                            # -------------------------------------------------
+                            # Replay-level table
+                            # -------------------------------------------------
+                            st.markdown("### 📄 Replay-level evaluation")
+
+                            if replay_df_all is not None and not replay_df_all.empty:
+                                replay_display_cols = [
+                                    "scenario_id",
+                                    "replay_id",
+                                    "evaluated_source",
+                                    "semantic_similarity",
+                                    "char_similarity",
+                                    "embedding_similarity",
+                                    "hybrid_similarity",
+                                    "bertscore_f1",
+                                    "meaning_changed",
+                                    "safety_regression",
+                                    "judge_verdict",
+                                    "judge_score",
+                                    "judge_risk_types",
+                                    "llm_similarity_to_reference",
+                                    "llm_replay_issues",
+                                    "llm_replay_reason",
+                                    "analysis_summary",
+                                ]
+                                replay_display_cols = [c for c in replay_display_cols if c in replay_df_all.columns]
+
+                                st.dataframe(
+                                    replay_df_all[replay_display_cols],
+                                    use_container_width=True,
+                                )
+
+                                csv_buf_rep = io.StringIO()
+                                replay_df_all.to_csv(csv_buf_rep, index=False)
+                                st.download_button(
+                                    "⬇️ Download replay-level CSV",
+                                    data=csv_buf_rep.getvalue().encode("utf-8"),
+                                    file_name=f"judge_grouped_replays_{int(time.time())}.csv",
+                                    mime="text/csv",
+                                )
+                            else:
+                                st.info("No replay-level rows generated.")
+
+                            # -------------------------------------------------
+                            # Raw JSON / debug
+                            # -------------------------------------------------
+                            with st.expander("🔍 Full aggregated robustness JSON", expanded=False):
+                                st.json(robustness_metrics)
+
+                            with st.expander("🔍 Summary JSON", expanded=False):
+                                st.json(summary)
 
 
 else:
