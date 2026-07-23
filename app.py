@@ -15,6 +15,7 @@ import hashlib
 import sqlite3
 import math
 import time
+import requests
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -52,6 +53,10 @@ SESSION_WINDOW = int(os.getenv("SESSION_WINDOW", "6"))
 
 # 🔹 Embedding config
 EMBED_MODEL_NAME = os.getenv("EMBED_MODEL_NAME", "Alibaba-NLP/gte-large-en-v1.5")
+# Important pour les runs avec vLLM sur GPU : on garde les embeddings sur CPU
+# afin d'éviter les OOM et les conflits de mémoire CUDA.
+EMBED_DEVICE = os.getenv("EMBED_DEVICE", "cpu")
+EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "1"))
 _EMBEDDER: Optional[SentenceTransformer] = None
 
 # 🔹 BERTScore config (langue / modèle)
@@ -62,7 +67,11 @@ BERTSCORE_MODEL_TYPE = os.getenv("BERTSCORE_MODEL_TYPE", "")  # ex: "microsoft/d
 def get_embedder():
     global _EMBEDDER
     if _EMBEDDER is None:
-        _EMBEDDER = SentenceTransformer(EMBED_MODEL_NAME, trust_remote_code=True)
+        _EMBEDDER = SentenceTransformer(
+            EMBED_MODEL_NAME,
+            trust_remote_code=True,
+            device=EMBED_DEVICE,
+        )
     return _EMBEDDER
 
 
@@ -92,8 +101,18 @@ def semantic_similarity_embeddings(a: str, b: str) -> dict:
 
     try:
         model = get_embedder()
-        emb_a = model.encode(a, normalize_embeddings=True)
-        emb_b = model.encode(b, normalize_embeddings=True)
+        emb_a = model.encode(
+            a,
+            normalize_embeddings=True,
+            convert_to_tensor=True,
+            batch_size=EMBED_BATCH_SIZE,
+        )
+        emb_b = model.encode(
+            b,
+            normalize_embeddings=True,
+            convert_to_tensor=True,
+            batch_size=EMBED_BATCH_SIZE,
+        )
 
         cos = float(util.cos_sim(emb_a, emb_b).item())  # [-1, 1]
         sim_01 = (cos + 1.0) / 2.0                      # → [0, 1]
@@ -331,7 +350,12 @@ def compute_replay_robustness(
 
     try:
         model = get_embedder()
-        emb_matrix = model.encode(cleaned, normalize_embeddings=True)
+        emb_matrix = model.encode(
+            cleaned,
+            normalize_embeddings=True,
+            convert_to_tensor=True,
+            batch_size=EMBED_BATCH_SIZE,
+        )
         cos_mat = util.cos_sim(emb_matrix, emb_matrix)  # [n, n]
 
         # ---------- CONSISTENCY ----------
@@ -813,14 +837,105 @@ def compute_context_dna(canonicals: List[str]) -> str:
 # LLM Router
 # =========================================
 def call_llm(prompt: str, model: Optional[str], params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Routeur LLM.
+
+    Priorité :
+    1) Si LIVE_API_BASE est défini et que le modèle n'est pas explicitement
+       openai:/anthropic:/lmstudio:, on appelle un endpoint OpenAI-compatible
+       local, typiquement vLLM: http://127.0.0.1:8000/v1.
+    2) Sinon, on garde les routes historiques lmstudio/openai/anthropic.
+    3) En dernier recours seulement : simulateur.
+    """
+    params = params or {}
     model = (model or LIVE_MODEL).strip()
     temperature = float(params.get("temperature", os.getenv("LIVE_TEMPERATURE", 0.2)))
     max_tokens = int(params.get("max_tokens", os.getenv("LIVE_MAX_TOKENS", 1024)))
     seed = params.get("seed")
+    agent = params.get("agent", "live")
 
+    # ------------------------------------------------------------
+    # vLLM / endpoint OpenAI-compatible via LIVE_API_BASE
+    # ------------------------------------------------------------
+    live_api_base = os.getenv("LIVE_API_BASE", "").strip().rstrip("/")
+
+    # Important : on ne force pas openai:/anthropic:/lmstudio: vers vLLM.
+    # Pour vLLM, utiliser LIVE_MODEL="mistralai/Mistral-7B-Instruct-v0.3"
+    # ou un autre nom exact exposé par /v1/models.
+    if live_api_base and not (
+        model.startswith("lmstudio:")
+        or model.startswith("openai:")
+        or model.startswith("anthropic:")
+    ):
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if seed is not None:
+            try:
+                payload["seed"] = int(seed)
+            except Exception:
+                payload["seed"] = seed
+        # Guided decoding : si l'appelant fournit un schéma JSON, on force
+        # vLLM à ne générer QUE du JSON conforme (pas de champ dupliqué,
+        # pas de risk_type hors-enum, pas d'objet parasite).
+        guided_json = params.get("guided_json")
+        if guided_json is not None:
+            payload["guided_json"] = guided_json
+            # backend explicite recommandé pour la stabilité
+            payload["guided_decoding_backend"] = params.get(
+                "guided_decoding_backend", "outlines"
+            )
+
+        t0 = time.time()
+        try:
+            resp = requests.post(
+                f"{live_api_base}/chat/completions",
+                json=payload,
+                timeout=int(os.getenv("LIVE_REQUEST_TIMEOUT", "300")),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            timing_ms = int((time.time() - t0) * 1000)
+
+            text = (
+                data.get("choices", [{}])[0]
+                .get("message", {})
+                .get("content", "")
+            )
+
+            return {
+                "text": text or "",
+                "raw": {
+                    "model_used": model,
+                    "selected": "vllm",
+                    "api_base": live_api_base,
+                    "timing_ms": timing_ms,
+                    "usage": data.get("usage", {}),
+                    "agent": agent,
+                },
+            }
+        except Exception as e:
+            timing_ms = int((time.time() - t0) * 1000)
+            return {
+                "text": "",
+                "raw": {
+                    "model_used": model,
+                    "selected": "vllm",
+                    "api_base": live_api_base,
+                    "timing_ms": timing_ms,
+                    "error": str(e),
+                    "agent": agent,
+                },
+            }
+
+    # ------------------------------------------------------------
+    # LM Studio historique
+    # ------------------------------------------------------------
     if model.startswith("lmstudio:"):
         lm_model = model.split(":", 1)[1]
-        agent = params.get("agent", "live")
         messages = [{"role": "user", "content": prompt}]
         t0 = time.time()
         try:
@@ -911,7 +1026,7 @@ def call_llm(prompt: str, model: Optional[str], params: Dict[str, Any]) -> Dict[
                 "raw": {"model_used": model, "selected": "anthropic", "error": str(e)},
             }
 
-    # fallback simulator
+    # fallback simulator uniquement si aucune route réelle n'est disponible
     return {
         "text": f"[simulator] Echo: {prompt[:200]}",
         "raw": {"model_used": model, "selected": "sim"},
