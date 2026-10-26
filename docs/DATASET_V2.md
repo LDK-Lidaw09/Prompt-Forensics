@@ -90,7 +90,7 @@ and `--split dev` (choosing thresholds) or `--split test` (reported results)
 for the replay runs, whose outputs feed the judges.
 
 Requirements: `pip install -e ".[ml,datagen]"` (embeddings and the Anthropic
-SDK), `ANTHROPIC_API_KEY`, and access to the Hugging Face Hub to download the
+SDK), an API key in `PF_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`), and access to the Hugging Face Hub to download the
 embedding model. A pilot (`--target 300`) sends about 30 requests: a round
 never asks for much more than the remaining target. If every request of a
 round fails (no key, no network, refusals), the run stops and says why.

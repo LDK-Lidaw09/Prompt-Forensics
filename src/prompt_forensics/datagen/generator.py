@@ -153,6 +153,22 @@ class Generation:
 
 Requests = Sequence[tuple[str, str]]
 
+# Read first, so that a key stored for this script does not collide with the
+# ANTHROPIC_API_KEY that some hosts (such as Claude Code) reserve for themselves.
+API_KEY_VARIABLES = ("PF_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY")
+
+
+def make_client():
+    """Anthropic client with the key from :data:`API_KEY_VARIABLES`."""
+    import os
+
+    import anthropic
+
+    for name in API_KEY_VARIABLES:
+        if os.environ.get(name):
+            return anthropic.Anthropic(api_key=os.environ[name], max_retries=6)
+    raise RuntimeError(f"no API key: set one of {', '.join(API_KEY_VARIABLES)}")
+
 
 def _request_params(model: str, prompt: str, max_tokens: int, effort: str | None) -> dict[str, Any]:
     output_config: dict[str, Any] = {"format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}}
@@ -186,9 +202,7 @@ class SyncGenerator:
     @property
     def client(self):
         if self._client is None:
-            import anthropic
-
-            self._client = anthropic.Anthropic(max_retries=6)
+            self._client = make_client()
         return self._client
 
     def _one(self, request_id: str, prompt: str) -> Generation:
@@ -233,9 +247,7 @@ class BatchGenerator:
     @property
     def client(self):
         if self._client is None:
-            import anthropic
-
-            self._client = anthropic.Anthropic(max_retries=6)
+            self._client = make_client()
         return self._client
 
     def _state_path(self, requests: Requests) -> Path:

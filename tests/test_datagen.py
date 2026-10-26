@@ -387,3 +387,15 @@ def test_batch_generator_never_resubmits_the_same_requests(tmp_path):
     assert [g.text for g in again] == [g.text for g in first] == ['{"prompts": ["x"]}'] * 2
     gen([("r1", "another prompt")])
     assert batches.created == 2 and len(list((tmp_path / "batches").glob("*.json"))) == 2
+
+
+def test_api_key_variable_order(monkeypatch):
+    from prompt_forensics.datagen import generator
+
+    monkeypatch.delenv("PF_ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="PF_ANTHROPIC_API_KEY"):
+        generator.make_client()
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "host-key")
+    monkeypatch.setenv("PF_ANTHROPIC_API_KEY", "script-key")
+    assert generator.make_client().api_key == "script-key"

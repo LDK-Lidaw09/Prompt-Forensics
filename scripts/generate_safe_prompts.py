@@ -9,7 +9,7 @@ Subcommands, in the order they are used:
     assemble  write the version 2 scenario files with the dev/test split
     sample    write the human annotation sheet and its key
 
-Example (needs ANTHROPIC_API_KEY):
+Example (needs PF_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY):
 
     python scripts/generate_safe_prompts.py audit --near
     python scripts/generate_safe_prompts.py generate --out data/safe_prompts_v2 --target 300 --max-rounds 1
