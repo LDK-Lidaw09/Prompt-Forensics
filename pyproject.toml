@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-forensics"
+version = "1.0.0"
+description = "Reference implementation of PSI (Prompt Scene Investigation), the Prompt Forensics framework of the M.Sc. thesis."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Lidaw Fabrice Ledjaki" }]
+dependencies = [
+    "cryptography>=42",
+    "pandas>=2.1",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Embedding cosine and BERTScore (Consistency / Fidelity, thesis 5.2).
+ml = [
+    "sentence-transformers>=3.0",
+    "bert-score>=0.3.13",
+    "torch>=2.1",
+]
+# Demo interface (thesis 4.5).
+ui = ["streamlit>=1.46"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
