@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Generation of the version 2 safe prompts (Claude API).
+# Generation of the version 2 safe prompts (Anthropic API).
 datagen = [
     "anthropic>=1.0",
     "numpy>=1.26",

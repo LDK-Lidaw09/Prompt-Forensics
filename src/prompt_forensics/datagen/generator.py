@@ -1,4 +1,4 @@
-"""Generation prompt and Claude API backends.
+"""Generation prompt and Anthropic API backends.
 
 The generator is called with a list of ``(request_id, prompt)`` pairs and
 returns one :class:`Generation` per request. Two backends:
@@ -10,7 +10,7 @@ returns one :class:`Generation` per request. Two backends:
   an interrupted run fetches the same batch again instead of paying twice.
 
 The answer is constrained to a JSON schema (structured outputs), so it never
-needs repairing. Current Claude models do not accept a temperature or a
+needs repairing. Current Anthropic models do not accept a temperature or a
 seed: the run is made traceable by recording every request, the model that
 served it and its raw answer, not by making it repeatable.
 """

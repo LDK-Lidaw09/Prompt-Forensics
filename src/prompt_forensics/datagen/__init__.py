@@ -11,7 +11,7 @@ realistic, distinct user requests:
 - :mod:`.contexts` -- the scenario contexts (system prompt + document) that
   the new prompts are written for, taken unchanged from version 1;
 - :mod:`.dedup` -- exact and near-duplicate detection;
-- :mod:`.generator` -- the generation prompt and the Claude API backends;
+- :mod:`.generator` -- the generation prompt and the Anthropic API backends;
 - :mod:`.pipeline` -- the generation rounds, the stopping rule and the
   output files;
 - :mod:`.assemble` -- the version 2 scenario files, the dev/test split and
