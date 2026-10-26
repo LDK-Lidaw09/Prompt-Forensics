@@ -238,6 +238,10 @@ def test_assemble_assigns_each_new_prompt_once_and_splits_by_document():
     assert [s["id"] for s in extra] == ["AUDIT_JB_S00001", "AUDIT_JB_S00002"]
     doc_b = next(s for s in v2 if s["context_id"] == cid_b)
     assert doc_b["safe_prompt"] is None and doc_b["safe_prompt_v1"] == "old safe"
+    # A scenario with no attack and no new safe prompt has nothing to run.
+    scenarios.append(scenario(10, doc="DOC_B", attack=None))
+    v2 = asm.assemble_scenarios(scenarios, kept, dev_fraction=0.5, seed=1)
+    assert len(v2) == 6 and "AUDIT_JB_0010" not in {s["id"] for s in v2}
     # seed 1 puts DOC_A in dev and DOC_B in test; a document never spans both.
     assert {s["split"] for s in v2 if s["context_id"] == cid_a} == {"dev"}
     assert {s["split"] for s in v2 if s["context_id"] == cid_b} == {"test"}

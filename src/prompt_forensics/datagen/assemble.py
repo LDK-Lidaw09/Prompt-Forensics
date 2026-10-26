@@ -5,7 +5,8 @@ prompt; its safe prompt is replaced by a new one generated for the same
 context (``safe_prompt_v1`` keeps the old text). Every new safe prompt is
 used once. When a context has more new safe prompts than scenarios, the
 extra ones become safe-only scenarios; when it has fewer, the remaining
-scenarios have no safe prompt (they stay in the attack runs).
+scenarios have no safe prompt (they stay in the attack runs). A scenario
+left with neither an attack nor a safe prompt is dropped.
 
 **Split.** ``split`` is ``dev`` or ``test`` per *document*, so that the
 prompts used to choose a threshold never share a document with the prompts
@@ -73,8 +74,10 @@ def assemble_scenarios(scenarios: Sequence[dict[str, Any]], kept: Sequence[dict[
         if pool.get(cid):
             row = pool[cid].pop()
             new.update(safe_prompt=row["text"], safe_prompt_id=row["id"], safe_kind=row["kind"])
-        else:
+        elif scenario.get("attack_prompt"):
             new.update(safe_prompt=None, safe_prompt_id=None, safe_kind=None)
+        else:
+            continue  # nothing left to run
         out.append(new)
 
     counters: Counter[str] = Counter()
