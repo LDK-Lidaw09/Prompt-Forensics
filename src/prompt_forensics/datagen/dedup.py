@@ -72,11 +72,15 @@ def default_embedder(batch_size: int = 64) -> EmbedFn:
 class DedupIndex:
     """Prompts kept so far, with their exact keys and embeddings."""
 
-    def __init__(self, embed: EmbedFn | None, threshold: float = 0.90):
+    def __init__(self, embed: EmbedFn | None, threshold: float = 0.90, chunk_size: int = 1024):
         # embed=None turns near-duplicate detection off (exact only).
         self.embed = embed
         self.threshold = threshold
-        self._keys: dict[str, str] = {}
+        # Candidates are compared to the kept prompts by blocks of this size,
+        # so memory stays at chunk_size x kept similarities.
+        self.chunk_size = chunk_size
+        self._keys: dict[str, str] = {}       # exact key of a kept prompt -> its id
+        self._redirect: dict[str, str] = {}   # exact key of a rejected prompt -> kept id it duplicates
         self._ids: list[str] = []
         self._chunks: list[np.ndarray] = []
         self._matrix: np.ndarray | None = None
@@ -91,56 +95,56 @@ class DedupIndex:
             self._chunks = []
         return self._matrix
 
+    def _exact_target(self, key: str) -> str | None:
+        return self._keys.get(key) or self._redirect.get(key)
+
     def add_batch(self, items: Sequence[tuple[str, str]]) -> list[Verdict]:
         """Check ``(item_id, masked_key_text)`` pairs in order; keep the new ones.
 
         ``masked_key_text`` is the text used for comparison (document name
-        already masked). Returns one verdict per item.
+        already masked). Returns one verdict per item. ``duplicate_of`` always
+        names a kept prompt.
         """
-        verdicts: list[Verdict | None] = [None] * len(items)
+        verdicts: list[Verdict] = []
+        for start in range(0, len(items), self.chunk_size):
+            verdicts += self._add_chunk(items[start : start + self.chunk_size])
+        return verdicts
+
+    def _add_chunk(self, items: Sequence[tuple[str, str]]) -> list[Verdict]:
         keys = [exact_key(text) for _, text in items]
-        pending: list[int] = []
-        batch_keys: dict[str, str] = {}
+        vectors = old_sims = new_sims = None
+        if self.embed is not None:
+            vectors = self.embed([text for _, text in items])
+            kept = self._kept_matrix()
+            old_sims = vectors @ kept.T if kept is not None and len(kept) else None
+            new_sims = vectors @ vectors.T
+
+        verdicts: list[Verdict] = []
+        accepted: list[int] = []  # positions in this chunk kept so far
         for i, ((item_id, _), key) in enumerate(zip(items, keys)):
-            first = self._keys.get(key) or batch_keys.get(key)
-            if first is not None:
-                verdicts[i] = Verdict(EXACT_DUPLICATE, first, 1.0)
-            else:
-                batch_keys[key] = item_id
-                pending.append(i)
-
-        if not pending:
-            return [v for v in verdicts if v is not None]
-
-        if self.embed is None:
-            for i in pending:
-                self._keep(items[i][0], keys[i], None)
-                verdicts[i] = Verdict(KEPT)
-            return list(verdicts)  # type: ignore[arg-type]
-
-        vectors = self.embed([items[i][1] for i in pending])
-        kept = self._kept_matrix()
-        old_sims = vectors @ kept.T if kept is not None and len(kept) else None
-        new_sims = vectors @ vectors.T
-        accepted: list[int] = []  # positions in `pending` kept so far
-        for p, i in enumerate(pending):
+            target = self._exact_target(key)
+            if target is not None:
+                verdicts.append(Verdict(EXACT_DUPLICATE, target, 1.0))
+                continue
+            if vectors is None:
+                self._keep(item_id, key, None)
+                verdicts.append(Verdict(KEPT))
+                continue
             best, best_id = -1.0, None
             if old_sims is not None:
-                j = int(np.argmax(old_sims[p]))
-                best, best_id = float(old_sims[p, j]), self._ids[j]
+                j = int(np.argmax(old_sims[i]))
+                best, best_id = float(old_sims[i, j]), self._ids[j]
             for q in accepted:
-                if new_sims[p, q] > best:
-                    best, best_id = float(new_sims[p, q]), items[pending[q]][0]
+                if new_sims[i, q] > best:
+                    best, best_id = float(new_sims[i, q]), items[q][0]
             if best_id is not None and best >= self.threshold:
-                verdicts[i] = Verdict(NEAR_DUPLICATE, best_id, round(best, 4))
+                self._redirect[key] = best_id
+                verdicts.append(Verdict(NEAR_DUPLICATE, best_id, round(best, 4)))
                 continue
-            accepted.append(p)
-            verdicts[i] = Verdict(KEPT, None, round(best, 4) if best_id is not None else None)
-
-        for p in accepted:
-            i = pending[p]
-            self._keep(items[i][0], keys[i], vectors[p : p + 1])
-        return list(verdicts)  # type: ignore[arg-type]
+            accepted.append(i)
+            self._keep(item_id, key, vectors[i : i + 1])
+            verdicts.append(Verdict(KEPT, None, round(best, 4) if best_id is not None else None))
+        return verdicts
 
     def _keep(self, item_id: str, key: str, vector: np.ndarray | None) -> None:
         self._keys[key] = item_id

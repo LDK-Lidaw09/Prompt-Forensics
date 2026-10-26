@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+from ..canonical import sha256_hex
 from .contexts import Context
 from .taxonomy import (
     DOMAIN_LABELS,
@@ -207,14 +208,23 @@ class SyncGenerator:
 
 
 class BatchGenerator:
-    """One Message Batch per call; 50 % of the synchronous price."""
+    """One Message Batch per call; 50 % of the synchronous price.
 
-    def __init__(self, state_path: str | Path, model: str = DEFAULT_MODEL, max_tokens: int = 8000,
-                 effort: str | None = "low", poll_s: int = 60, client: Any = None,
-                 log: Callable[[str], None] = print):
-        self.state_path = Path(state_path)
+    Each submitted batch is recorded in ``state_dir`` under a hash of its
+    requests (ids and prompts) and the record is never deleted: a run that
+    stops at any point after submission (while polling, or before the answers
+    are saved) finds the same batch again when it is resumed, and never pays
+    twice for the same requests. Batch results stay available for 29 days.
+    """
+
+    def __init__(self, state_dir: str | Path, model: str = DEFAULT_MODEL, max_tokens: int = 8000,
+                 effort: str | None = "low", poll_s: int = 60, max_wait_s: int = 26 * 3600,
+                 client: Any = None, log: Callable[[str], None] = print):
+        self.state_dir = Path(state_dir)
         self.model, self.max_tokens, self.effort = model, max_tokens, effort
-        self.poll_s, self._client, self.log = poll_s, client, log
+        # The API expires a batch after 24 hours, so polling stops a little later.
+        self.poll_s, self.max_wait_s = poll_s, max_wait_s
+        self._client, self.log = client, log
 
     @property
     def client(self):
@@ -224,10 +234,17 @@ class BatchGenerator:
             self._client = anthropic.Anthropic(max_retries=6)
         return self._client
 
+    def _state_path(self, requests: Requests) -> Path:
+        digest = sha256_hex(json.dumps([list(r) for r in requests], ensure_ascii=False))[:20]
+        return self.state_dir / f"batch_{digest}.json"
+
     def __call__(self, requests: Requests) -> list[Generation]:
         ids = [r[0] for r in requests]
-        batch_id = self._resume(ids)
-        if batch_id is None:
+        state_path = self._state_path(requests)
+        if state_path.exists():
+            batch_id = json.loads(state_path.read_text())["batch_id"]
+            self.log(f"resuming batch {batch_id}")
+        else:
             batch = self.client.messages.batches.create(
                 requests=[
                     {"custom_id": rid, "params": _request_params(self.model, p, self.max_tokens, self.effort)}
@@ -235,12 +252,20 @@ class BatchGenerator:
                 ]
             )
             batch_id = batch.id
-            self.state_path.write_text(json.dumps({"batch_id": batch_id, "request_ids": ids}))
+            self.state_dir.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps({"batch_id": batch_id, "request_ids": ids}))
             self.log(f"submitted batch {batch_id} ({len(ids)} requests)")
+
+        deadline = time.monotonic() + self.max_wait_s
         while True:
             batch = self.client.messages.batches.retrieve(batch_id)
             if batch.processing_status == "ended":
                 break
+            if time.monotonic() > deadline:
+                raise TimeoutError(
+                    f"batch {batch_id} still {batch.processing_status} after {self.max_wait_s} s; "
+                    "run the same command again to keep waiting for it"
+                )
             self.log(f"batch {batch_id}: {batch.request_counts.processing} requests still processing")
             time.sleep(self.poll_s)
 
@@ -252,15 +277,4 @@ class BatchGenerator:
             else:
                 detail = getattr(getattr(result.result, "error", None), "type", "")
                 by_id[result.custom_id] = Generation(result.custom_id, error=f"batch {kind} {detail}".strip())
-        self.state_path.unlink(missing_ok=True)
         return [by_id.get(rid, Generation(rid, error="missing from batch results")) for rid in ids]
-
-    def _resume(self, ids: list[str]) -> str | None:
-        """Batch id of an earlier, interrupted submission of the same requests."""
-        if not self.state_path.exists():
-            return None
-        state = json.loads(self.state_path.read_text())
-        if state.get("request_ids") == ids:
-            self.log(f"resuming batch {state['batch_id']}")
-            return state["batch_id"]
-        return None

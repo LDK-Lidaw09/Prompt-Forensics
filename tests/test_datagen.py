@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import random
 import re
+from collections import Counter
 
 import numpy as np
 import pytest
@@ -22,13 +23,27 @@ from prompt_forensics.datagen.dedup import (
     exact_key,
     mask_document,
 )
-from prompt_forensics.datagen.generator import Generation, build_prompt, parse_prompts
+from prompt_forensics.datagen.generator import (
+    BatchGenerator,
+    Generation,
+    build_prompt,
+    parse_prompts,
+)
 from prompt_forensics.datagen.pipeline import (
     GenerationConfig,
     GenerationRun,
+    _read_jsonl,
     filter_reason,
 )
-from prompt_forensics.datagen.taxonomy import HARD_NEGATIVE, STANDARD, Slot, sample_slot
+from prompt_forensics.datagen.taxonomy import (
+    HARD_NEGATIVE,
+    STANDARD,
+    Slot,
+    format_description,
+    sample_slot,
+    task_description,
+)
+from prompt_forensics.scenarios import load_scenarios, select_scenarios
 
 
 def bow_embed(texts):
@@ -97,9 +112,11 @@ def test_audit_counts_v1_style_templates():
 # ----------------------------------------------------------------- prompts
 def test_build_prompt_contains_context_slot_and_avoid_list():
     ctx = contexts_from_scenarios([scenario(1)])[0]
-    slot = Slot(HARD_NEGATIVE, "summarize", "a CFO", "table", "jailbreak")
+    slot = Slot(HARD_NEGATIVE, "checklist", "a CFO", "table", "jailbreak")
     text = build_prompt(ctx, slot, 5, avoid=["Earlier request"])
     assert ctx.system_prompt in text and "AR_AGING" in text and "a CFO" in text
+    assert f"The user wants {task_description('checklist')}." in text
+    assert f"The user expects {format_description('table')}." in text
     assert "jailbreak" in text and "- Earlier request" in text and "Write 5 different" in text
     plain = build_prompt(ctx, Slot(STANDARD, "summarize", "a CFO", "table", "jailbreak"), 5)
     assert "difficult legitimate cases" not in plain and "already in the dataset" not in plain
@@ -221,13 +238,36 @@ def test_assemble_assigns_each_new_prompt_once_and_splits_by_document():
     assert [s["id"] for s in extra] == ["AUDIT_JB_S00001", "AUDIT_JB_S00002"]
     doc_b = next(s for s in v2 if s["context_id"] == cid_b)
     assert doc_b["safe_prompt"] is None and doc_b["safe_prompt_v1"] == "old safe"
-    assert len({s["split"] for s in v2 if s["context_id"] == cid_a}) == 1
+    # seed 1 puts DOC_A in dev and DOC_B in test; a document never spans both.
+    assert {s["split"] for s in v2 if s["context_id"] == cid_a} == {"dev"}
+    assert {s["split"] for s in v2 if s["context_id"] == cid_b} == {"test"}
 
 
 def test_write_scenarios_layout(tmp_path):
-    paths = asm.write_scenarios([scenario(1), scenario(2, family="data_leakage")], tmp_path)
-    assert sorted(p.relative_to(tmp_path).as_posix() for p in paths) == [
+    root = tmp_path / "v2"
+    paths = asm.write_scenarios([scenario(1), scenario(2, family="data_leakage"), scenario(3)], root)
+    assert sorted(p.relative_to(root).as_posix() for p in paths) == [
         "data_leakage/audit_scenarios.json", "jailbreak/audit_scenarios.json"]
+    jb = json.loads((root / "jailbreak/audit_scenarios.json").read_text())
+    assert [s["id"] for s in jb] == ["AUDIT_JB_0001", "AUDIT_JB_0003"]
+    assert not (tmp_path / "v2.partial").exists()
+    # The runners can load the assembled root as is.
+    assert len(load_scenarios(root)) == 3
+    with pytest.raises(FileExistsError):
+        asm.write_scenarios([scenario(1)], root)
+    asm.write_scenarios([scenario(1)], root, overwrite=True)
+    assert len(load_scenarios(root)) == 1
+
+
+def test_write_scenarios_rejects_path_components(tmp_path):
+    with pytest.raises(ValueError):
+        asm.write_scenarios([scenario(1, family="../escape")], tmp_path / "v2")
+
+
+def test_select_scenarios_by_split():
+    rows = [{**scenario(1), "split": "dev"}, {**scenario(2), "split": "test"}, scenario(3)]
+    assert [s["id"] for s in select_scenarios(rows, "safe", split="test")] == ["AUDIT_JB_0002"]
+    assert len(select_scenarios(rows, "safe")) == 3
 
 
 def test_annotation_sample_is_stratified_and_blind():
@@ -242,4 +282,108 @@ def test_annotation_sample_is_stratified_and_blind():
     assert set(sheet[0]) == set(asm.SHEET_FIELDS)
     assert "kind" not in sheet[0]
     assert sum(k["kind"] == HARD_NEGATIVE for k in key) == 10
+    assert Counter(k["domain"] for k in key) == {"audit": 25, "health": 25}
+    assert Counter((k["domain"], k["kind"]) for k in key) == {
+        ("audit", STANDARD): 20, ("audit", HARD_NEGATIVE): 5,
+        ("health", STANDARD): 20, ("health", HARD_NEGATIVE): 5}
     assert len({k["safe_prompt_id"] for k in key}) == 50
+
+
+# ------------------------------------------------------ review follow-ups
+def test_exact_copy_of_rejected_near_duplicate_points_to_kept_prompt():
+    index = DedupIndex(bow_embed, threshold=0.9)
+    index.add_batch([("a", "list the main risks of this report")])
+    verdicts = index.add_batch([("b", "this report list the main risks"), ("c", "This report: list the main risks!")])
+    assert verdicts[0].status == NEAR_DUPLICATE and verdicts[0].duplicate_of == "a"
+    assert verdicts[1].status == EXACT_DUPLICATE and verdicts[1].duplicate_of == "a"
+
+
+def test_chunked_comparison_gives_the_same_verdicts():
+    items = [(str(i), text) for i, text in enumerate([
+        "list the main risks", "the main risks list", "draft an email", "an email draft",
+        "define materiality", "materiality define", "plan the audit", "summarize findings"])]
+    whole = DedupIndex(bow_embed, 0.9).add_batch(items)
+    chunked = DedupIndex(bow_embed, 0.9, chunk_size=3).add_batch(items)
+    assert whole == chunked
+
+
+def test_small_target_sends_few_requests(tmp_path):
+    scenarios = [scenario(i, doc=f"DOC_{i}") for i in range(40)]
+    contexts = contexts_from_scenarios(scenarios)
+    gen = FakeGenerator()
+    config = GenerationConfig(out_dir=tmp_path, target=12, per_call=5, max_rounds=1)
+    GenerationRun(config, contexts, embed=None, log=lambda _m: None).run(gen)
+    assert gen.calls == 3  # ceil(12 / 5), not one per context
+
+
+def test_changed_prompt_is_not_answered_from_an_old_response(tmp_path):
+    _, contexts = contexts_two()
+    gen = FakeGenerator()
+    config = GenerationConfig(out_dir=tmp_path, target=1000, per_call=5, max_rounds=1)
+    GenerationRun(config, contexts, embed=None, log=lambda _m: None).run_round(1, gen)
+    assert gen.calls == 2
+    # Interrupted before the round was recorded, then resumed with another setting.
+    (tmp_path / "rounds.csv").unlink()
+    changed = GenerationConfig(out_dir=tmp_path, target=1000, per_call=4, max_rounds=1)
+    GenerationRun(changed, contexts, embed=None, log=lambda _m: None).run_round(1, gen)
+    assert gen.calls == 4
+    # Resumed again with the same setting: the answers are reused.
+    (tmp_path / "rounds.csv").unlink()
+    GenerationRun(changed, contexts, embed=None, log=lambda _m: None).run_round(1, gen)
+    assert gen.calls == 4
+
+
+def test_truncated_last_line_is_ignored(tmp_path):
+    path = tmp_path / "x.jsonl"
+    path.write_text('{"a": 1}\n{"a": 2}\n{"a": ')
+    assert _read_jsonl(path) == [{"a": 1}, {"a": 2}]
+    path.write_text('{"a": \n{"a": 2}\n')
+    with pytest.raises(json.JSONDecodeError):
+        _read_jsonl(path)
+
+
+def test_run_stops_when_every_request_fails(tmp_path):
+    _, contexts = contexts_two()
+
+    def broken(requests):
+        return [Generation(rid, error="ImportError: No module named 'anthropic'") for rid, _ in requests]
+
+    config = GenerationConfig(out_dir=tmp_path, target=100, per_call=5, max_rounds=10)
+    run = GenerationRun(config, contexts, embed=None, log=lambda _m: None)
+    reason = run.run(broken)
+    assert len(run.rounds) == 1 and "No module named 'anthropic'" in reason
+
+
+class FakeBatches:
+    """Message Batches stand-in: every request succeeds immediately."""
+
+    def __init__(self):
+        self.created = 0
+
+    def create(self, requests):
+        self.created += 1
+        self.requests = requests
+        return type("Batch", (), {"id": f"batch_{self.created}"})()
+
+    def retrieve(self, batch_id):
+        return type("Batch", (), {"processing_status": "ended"})()
+
+    def results(self, batch_id):
+        for r in self.requests:
+            text = type("Text", (), {"type": "text", "text": '{"prompts": ["x"]}'})()
+            message = type("Msg", (), {"content": [text], "model": "m", "stop_reason": "end_turn",
+                                       "usage": {"input_tokens": 1}})()
+            result = type("Result", (), {"type": "succeeded", "message": message})()
+            yield type("Item", (), {"custom_id": r["custom_id"], "result": result})()
+
+
+def test_batch_generator_never_resubmits_the_same_requests(tmp_path):
+    batches = FakeBatches()
+    client = type("Client", (), {"messages": type("Messages", (), {"batches": batches})()})()
+    gen = BatchGenerator(tmp_path / "batches", client=client, log=lambda _m: None)
+    first = gen([("r1", "p1"), ("r2", "p2")])
+    again = gen([("r1", "p1"), ("r2", "p2")])  # e.g. a crash before the answers were saved
+    assert batches.created == 1
+    assert [g.text for g in again] == [g.text for g in first] == ['{"prompts": ["x"]}'] * 2
+    gen([("r1", "another prompt")])
+    assert batches.created == 2 and len(list((tmp_path / "batches").glob("*.json"))) == 2

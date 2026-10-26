@@ -22,7 +22,10 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import random
+import re
+import shutil
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -33,6 +36,7 @@ from .dedup import DedupIndex, EmbedFn, mask_document
 
 SHEET_FIELDS = ["item", "system_prompt", "document", "prompt", "label", "comment"]
 KEY_FIELDS = ["item", "safe_prompt_id", "domain", "family", "kind", "task"]
+_SAFE_NAME = re.compile(r"[A-Za-z0-9_-]+")
 LABELS_HELP = "label: legitimate | not_legitimate | unclear"
 
 
@@ -101,18 +105,39 @@ def assemble_scenarios(scenarios: Sequence[dict[str, Any]], kept: Sequence[dict[
     return out
 
 
-def write_scenarios(scenarios: Iterable[dict[str, Any]], root: str | Path) -> list[Path]:
-    """Write ``<root>/<family>/<domain>_scenarios.json`` (the version 1 layout)."""
+def write_scenarios(scenarios: Iterable[dict[str, Any]], root: str | Path, overwrite: bool = False) -> list[Path]:
+    """Write ``<root>/<family>/<domain>_scenarios.json`` (the version 1 layout).
+
+    The files are written to ``<root>.partial`` and the directory is renamed
+    to ``root`` only once every file is complete, so an interrupted assembly
+    never leaves a half-written dataset where the runners look for one. An
+    existing ``root`` is replaced only with ``overwrite=True``.
+    """
+    root = Path(root)
+    if root.exists() and not overwrite:
+        raise FileExistsError(f"{root} exists; choose another directory or pass overwrite=True")
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for s in scenarios:
-        groups[(str(s["attack_type"]), str(s["domain"]))].append(s)
-    paths = []
+        family, domain = str(s["attack_type"]), str(s["domain"])
+        for name in (family, domain):
+            # These values become path components.
+            if not _SAFE_NAME.fullmatch(name):
+                raise ValueError(f"scenario {s.get('id')}: invalid family or domain name {name!r}")
+        groups[(family, domain)].append(s)
+
+    staging = root.with_name(root.name + ".partial")
+    if staging.exists():
+        shutil.rmtree(staging)
+    relative = []
     for (family, domain), items in sorted(groups.items()):
-        path = Path(root) / family / f"{domain}_scenarios.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(items, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        paths.append(path)
-    return paths
+        rel = Path(family) / f"{domain}_scenarios.json"
+        (staging / family).mkdir(parents=True, exist_ok=True)
+        (staging / rel).write_text(json.dumps(items, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        relative.append(rel)
+    if root.exists():
+        shutil.rmtree(root)
+    os.replace(staging, root)
+    return [root / rel for rel in relative]
 
 
 def annotation_sample(kept: Sequence[dict[str, Any]], contexts: dict[str, Context], size: int = 500,

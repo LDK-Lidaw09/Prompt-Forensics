@@ -24,6 +24,8 @@ def main() -> None:
     parser.add_argument("--run-mode", choices=["attacks", "safe"], required=True)
     parser.add_argument("--attack-filter", help="keep one family, e.g. jailbreak")
     parser.add_argument("--limit", type=int, help="first N scenarios only (for quick tests)")
+    parser.add_argument("--split", choices=["dev", "test"],
+                        help="dataset v2 only: replay one split (dev for thresholds, test for results)")
     parser.add_argument("--num-replays", type=int, default=10)
     parser.add_argument("--model", help="victim model id (default: LIVE_MODEL)")
     parser.add_argument("--temperature", type=float, help="default: LIVE_TEMPERATURE (0.2)")
@@ -46,6 +48,7 @@ def main() -> None:
     csv_path, jsonl_path = run_replays(ReplayConfig(
         run_mode=args.run_mode,
         attack_filter=args.attack_filter,
+        split=args.split,
         limit=args.limit,
         num_replays=args.num_replays,
         target_model=args.model,

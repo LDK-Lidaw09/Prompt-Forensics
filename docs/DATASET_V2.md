@@ -84,7 +84,15 @@ python scripts/generate_safe_prompts.py assemble --out data/safe_prompts_v2 --sc
 python scripts/generate_safe_prompts.py sample --out data/safe_prompts_v2 --size 500
 ```
 
-Then run the experiments on the new files with `--scenario-root data/scenarios_v2`.
+Then run the experiments on the new files with `--scenario-root data/scenarios_v2`,
+and `--split dev` (choosing thresholds) or `--split test` (reported results)
+for the replay runs, whose outputs feed the judges.
 
-Requirements: `ANTHROPIC_API_KEY`, the `ml` extra (embeddings) and access to
-the Hugging Face Hub to download the embedding model.
+Requirements: `pip install -e ".[ml,datagen]"` (embeddings and the Anthropic
+SDK), `ANTHROPIC_API_KEY`, and access to the Hugging Face Hub to download the
+embedding model. A pilot (`--target 300`) sends about 30 requests: a round
+never asks for much more than the remaining target. If every request of a
+round fails (no key, no network, refusals), the run stops and says why.
+`assemble` writes its summary to `<out>/assembly.json`, not into the
+scenario root, and refuses to replace an existing scenario root without
+`--overwrite`.

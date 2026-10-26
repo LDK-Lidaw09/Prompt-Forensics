@@ -60,6 +60,7 @@ class ReplayConfig:
     run_mode: str = "attacks"
     attack_filter: str | None = None
     limit: int | None = None
+    split: str | None = None               # "dev" or "test" (dataset v2 only)
     num_replays: int = 10
     target_model: str | None = None        # default: LIVE_MODEL
     temperature: float | None = None       # default: LIVE_TEMPERATURE (0.2)
@@ -210,7 +211,7 @@ def run_replays(cfg: ReplayConfig, progress: Callable[[str], None] = print) -> t
     """Run the replay experiment. Returns ``(csv_path, jsonl_path)``."""
     cfg = cfg.resolved()
     scenarios = select_scenarios(load_scenarios(cfg.scenario_root), cfg.run_mode,
-                                 cfg.attack_filter, cfg.limit)
+                                 cfg.attack_filter, cfg.limit, cfg.split)
     if not scenarios:
         raise ValueError("no scenario matches the selection")
 

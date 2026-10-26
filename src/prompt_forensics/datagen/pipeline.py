@@ -31,6 +31,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+import os
 import random
 import re
 import subprocess
@@ -106,8 +107,18 @@ def filter_reason(text: str, kind: str, min_words: int, max_words: int) -> str |
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
+    rows = []
     with path.open(encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+        lines = [line for line in handle if line.strip()]
+    for n, line in enumerate(lines):
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            # A run killed while appending leaves a truncated last line; the
+            # round it belongs to is redone on resume. Anything else is an error.
+            if n != len(lines) - 1:
+                raise
+    return rows
 
 
 def _append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
@@ -117,7 +128,10 @@ def _append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 
 
 def _write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    """Replace ``path`` atomically, so an interruption never leaves it half written."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def _git_commit() -> str | None:
@@ -186,33 +200,51 @@ class GenerationRun:
         return [c for c in self.contexts if self.kept_per_context[c.context_id] < self.quota]
 
     def build_requests(self, round_no: int) -> list[dict[str, Any]]:
-        """One request per open context. Deterministic given the seed and the state."""
+        """At most one request per open context. Deterministic given the seed and the state.
+
+        A round never asks for much more than what is still missing: when the
+        remaining target is smaller than ``per_call`` x open contexts (a pilot,
+        or the last round), only ``ceil(remaining / per_call)`` contexts are
+        served, those with the fewest kept prompts first, ties broken at random.
+        """
+        remaining = self.config.target - len(self.kept)
+        wanted = math.ceil(remaining / self.config.per_call)
+        order = random.Random(f"{self.config.seed}:{round_no}:order")
+        contexts = self.open_contexts()
+        tiebreak = {c.context_id: order.random() for c in contexts}
+        contexts.sort(key=lambda c: (self.kept_per_context[c.context_id], tiebreak[c.context_id]))
         requests = []
-        for context in self.open_contexts():
+        for context in contexts[: max(wanted, 0)]:
             rng = random.Random(f"{self.config.seed}:{round_no}:{context.context_id}")
             slot = sample_slot(rng, context.domain, context.family, self.config.hard_negative_rate)
             avoid = list(self.recent_per_doc[context.doc_key])
+            prompt = build_prompt(context, slot, self.config.per_call, avoid)
             requests.append({
                 "request_id": f"r{round_no:02d}-{context.context_id}",
                 "round": round_no,
                 "context_id": context.context_id,
                 "slot": slot,
-                "prompt": build_prompt(context, slot, self.config.per_call, avoid),
+                "prompt": prompt,
+                "prompt_sha256": sha256_hex(prompt),
             })
         return requests
 
+    def _reusable(self, request: dict[str, Any]) -> bool:
+        """An earlier successful answer to exactly this prompt (resumed run)."""
+        answer = self.responses.get(request["request_id"], {})
+        return bool(answer.get("ok")) and answer.get("prompt_sha256") == request["prompt_sha256"]
+
     def run_round(self, round_no: int, generate: Generator) -> dict[str, Any]:
         requests = self.build_requests(round_no)
+        todo = [r for r in requests if not self._reusable(r)]
         _append_jsonl(self.path("requests.jsonl"), (
-            {**{k: v for k, v in r.items() if k != "slot"}, "slot": r["slot"].as_dict()}
-            for r in requests if r["request_id"] not in self.responses
+            {**{k: v for k, v in r.items() if k != "slot"}, "slot": r["slot"].as_dict()} for r in todo
         ))
-        todo = [(r["request_id"], r["prompt"]) for r in requests
-                if not self.responses.get(r["request_id"], {}).get("ok")]
         if todo:
             self.log(f"round {round_no}: {len(todo)} generation requests")
-            answers = generate(todo)
-            rows = [{**asdict(a), "ok": a.ok, "round": round_no} for a in answers]
+            answers = generate([(r["request_id"], r["prompt"]) for r in todo])
+            rows = [{**asdict(a), "ok": a.ok, "round": round_no, "prompt_sha256": r["prompt_sha256"]}
+                    for a, r in zip(answers, todo)]
             _append_jsonl(self.path("responses.jsonl"), rows)
             self.responses.update({r["request_id"]: r for r in rows})
 
@@ -220,7 +252,7 @@ class GenerationRun:
         candidates: list[dict[str, Any]] = []
         for request in requests:
             answer = self.responses.get(request["request_id"], {})
-            if not answer.get("ok"):
+            if not self._reusable(request):
                 stats["failed_requests"] += 1
                 continue
             try:
@@ -304,6 +336,13 @@ class GenerationRun:
         return summary
 
     def stop_reason(self) -> str | None:
+        last = self.rounds[-1] if self.rounds else None
+        if last and int(last["requests"]) and int(last["failed_requests"]) == int(last["requests"]):
+            errors = Counter(
+                (r.get("error") or r.get("stop_reason") or "unparseable answer")[:120]
+                for r in self.responses.values() if r.get("round") == int(self.rounds[-1]["round"])
+            )
+            return f"every request of the last round failed: {errors.most_common(1)[0][0] if errors else '?'}"
         if len(self.kept) >= self.config.target:
             return "target reached"
         if not self.open_contexts():

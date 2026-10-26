@@ -72,7 +72,7 @@ def cmd_generate(args) -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     if args.backend == "batch":
-        generate = BatchGenerator(out / "pending_batch.json", args.model, args.max_tokens, args.effort)
+        generate = BatchGenerator(out / "batches", args.model, args.max_tokens, args.effort)
     else:
         generate = SyncGenerator(args.model, args.max_tokens, args.effort, args.workers,
                                  fallbacks=not args.no_fallbacks)
@@ -95,7 +95,7 @@ def cmd_assemble(args) -> None:
     scenarios = load_scenarios(args.scenario_root)
     kept = _read_jsonl(Path(args.out) / "safe_prompts.jsonl")
     v2 = asm.assemble_scenarios(scenarios, kept, args.dev_fraction, args.seed)
-    paths = asm.write_scenarios(v2, args.scenario_out)
+    paths = asm.write_scenarios(v2, args.scenario_out, overwrite=args.overwrite)
     with_safe = [s for s in v2 if s.get("safe_prompt")]
     summary = {
         "scenario_files": len(paths),
@@ -106,7 +106,10 @@ def cmd_assemble(args) -> None:
         "safe_by_split": dict(Counter(s["split"] for s in with_safe)),
         "safe_by_kind": dict(Counter(s["safe_kind"] for s in with_safe)),
     }
-    (Path(args.scenario_out) / "assembly.json").write_text(json.dumps(summary, indent=2) + "\n")
+    # Kept with the generation run: every .json under the scenario root is read
+    # as a scenario file by the runners.
+    summary["scenario_root"] = str(args.scenario_out)
+    (Path(args.out) / "assembly.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2))
 
 
@@ -162,6 +165,7 @@ def main() -> None:
     p.add_argument("--out", required=True, help="directory of the generation run")
     p.add_argument("--scenario-out", required=True, help="root of the version 2 scenarios")
     p.add_argument("--dev-fraction", type=float, default=0.2, help="share of documents in the dev split")
+    p.add_argument("--overwrite", action="store_true", help="replace an existing --scenario-out directory")
     p.set_defaults(func=cmd_assemble)
 
     p = sub.add_parser("sample", help="human annotation sample")
