@@ -35,7 +35,9 @@ from .taxonomy import (
     task_description,
 )
 
-DEFAULT_MODEL = "claude-opus-5-5"
+# Haiku: about 1/40 of the Opus price, enough for short user requests.
+# Use --model claude-opus-5-5 for the most varied prompts.
+DEFAULT_MODEL = "claude-haiku-5-5"
 
 OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -176,7 +178,9 @@ class SyncGenerator:
     def __init__(self, model: str = DEFAULT_MODEL, max_tokens: int = 8000, effort: str | None = "low",
                  workers: int = 8, fallbacks: bool = True, client: Any = None):
         self.model, self.max_tokens, self.effort = model, max_tokens, effort
-        self.workers, self.fallbacks = workers, fallbacks
+        # Server-side fallback after a safety decline is not offered for Haiku.
+        self.workers = workers
+        self.fallbacks = fallbacks and not model.startswith("claude-haiku")
         self._client = client
 
     @property

@@ -37,7 +37,8 @@ Code: `src/prompt_forensics/datagen/`, command line:
    **hard negatives**: legitimate requests that look, on the surface, like
    the attack family of the context (a translation of the user's own text in
    a data-leakage context, a training role-play in a jailbreak context, ...).
-3. **Generation.** Claude (`claude-opus-5-5` by default) through the
+3. **Generation.** Claude (`claude-haiku-5-5` by default, about 1/40 of the
+   Opus price; `--model claude-opus-5-5` for more varied prompts) through the
    Messages API or the Message Batches API, 10 prompts per request, answer
    constrained to a JSON schema. The request shows the system prompt, the
    document, the slot and up to 15 prompts already kept for the same document,

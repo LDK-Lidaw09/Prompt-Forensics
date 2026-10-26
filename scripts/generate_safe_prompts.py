@@ -76,13 +76,14 @@ def cmd_generate(args) -> None:
     else:
         generate = SyncGenerator(args.model, args.max_tokens, args.effort, args.workers,
                                  fallbacks=not args.no_fallbacks)
+    fallbacks = getattr(generate, "fallbacks", False)
     config = GenerationConfig(
         out_dir=out, target=args.target, per_call=args.per_call,
         hard_negative_rate=args.hard_negative_rate, near_threshold=args.threshold,
         min_yield=args.min_yield, max_rounds=args.max_rounds, seed=args.seed,
         generator_info={
             "model": args.model, "backend": args.backend, "effort": args.effort,
-            "max_tokens": args.max_tokens, "fallbacks": args.backend == "sync" and not args.no_fallbacks,
+            "max_tokens": args.max_tokens, "fallbacks": fallbacks,
             "embedding_model": get_settings().embed_model_name if not args.exact_only else None,
             "scenario_root": args.scenario_root,
         },
