@@ -1,5 +1,5 @@
 # Everything needed to run the experiments and the demo interface.
-# Equivalent to: pip install -e ".[ml,ui,dev]"
+# Equivalent to: pip install -e ".[ml,ui,datagen,dev]"
 cryptography>=42
 pandas>=2.1
 requests>=2.31
@@ -7,5 +7,7 @@ python-dotenv>=1.0
 sentence-transformers>=3.0
 bert-score>=0.3.13
 torch>=2.1
+anthropic>=1.0
+numpy>=1.26
 streamlit>=1.46
 pytest>=8

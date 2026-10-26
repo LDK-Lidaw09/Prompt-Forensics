@@ -35,6 +35,11 @@ prompts (the last 100 scenarios of each file have no attack prompt).
 Scenarios are loaded in a fixed order (files sorted by path), so `--limit N`
 always selects the same scenarios.
 
+Version 2 of the safe prompts (distinct, realistic user requests in the same
+contexts) is generated with `scripts/generate_safe_prompts.py`; see
+[DATASET_V2.md](DATASET_V2.md). Pass `--scenario-root data/scenarios_v2` to
+the runners to use it.
+
 ## 3. Replay pools and stability (sections 5.2, 6.1; Tables 6.1 and 6.2)
 
 ```bash
