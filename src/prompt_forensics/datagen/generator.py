@@ -154,7 +154,7 @@ class Generation:
 Requests = Sequence[tuple[str, str]]
 
 # Read first, so that a key stored for this script does not collide with the
-# ANTHROPIC_API_KEY that some hosts (such as Claude Code) reserve for themselves.
+# ANTHROPIC_API_KEY that some hosted environments reserve for themselves.
 API_KEY_VARIABLES = ("PF_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY")
 
 
