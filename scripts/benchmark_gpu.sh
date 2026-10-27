@@ -31,7 +31,7 @@ mkdir -p "$OUT"
 # A virtual environment: pip cannot replace the Debian packages of the pod
 # image (PyJWT, blinker, ...), and vLLM pins its own torch anyway.
 if [ ! -d .venv ]; then
-    python3 -m venv .venv
+    python3 -m venv .venv || { rm -rf .venv; apt-get update -qq && apt-get install -y -qq python3-venv && python3 -m venv .venv; }
 fi
 # shellcheck disable=SC1091
 . .venv/bin/activate
