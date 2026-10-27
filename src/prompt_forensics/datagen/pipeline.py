@@ -13,7 +13,8 @@ The run stops when the target is reached, when a round keeps less than
 would mostly produce duplicates), or after ``max_rounds``.
 
 Everything is written to ``out_dir`` as it happens, so the run can be
-interrupted and resumed, and every kept prompt can be traced back to the
+interrupted and resumed (on resume the kept prompts are checked again, so a
+change of the deduplication rule prunes them and the next rounds top up), and every kept prompt can be traced back to the
 request and the answer that produced it:
 
 =====================  ======================================================
@@ -21,6 +22,7 @@ request and the answer that produced it:
 ``responses.jsonl``    every raw answer (serving model, usage, stop reason)
 ``candidates.jsonl``   every generated prompt and what happened to it
 ``safe_prompts.jsonl`` the prompts kept, with their ids
+``pruned.jsonl``       kept prompts removed on resume by a stricter deduplication
 ``rounds.csv``         per round: generated, kept, yield (saturation curve)
 ``manifest.json``      settings, model, code version, counts and token usage
 =====================  ======================================================
@@ -162,6 +164,8 @@ class GenerationRun:
         self.recent_per_doc: dict[str, deque[str]] = defaultdict(lambda: deque(maxlen=config.avoid_examples))
         self.rounds: list[dict[str, Any]] = []
         self.responses: dict[str, dict[str, Any]] = {}
+        self.next_number = 1          # SP2_<number> of the next kept prompt
+        self.pruned_after_round = 0   # last round before a prune on resume
         self._load()
 
     # ------------------------------------------------------------------ files
@@ -181,14 +185,30 @@ class GenerationRun:
         candidates = [r for r in _read_jsonl(self.path("candidates.jsonl")) if r["round"] <= done]
         _write_jsonl(self.path("candidates.jsonl"), candidates)
         self.responses = {r["request_id"]: r for r in _read_jsonl(self.path("responses.jsonl"))}
+        pruned = _read_jsonl(self.path("pruned.jsonl"))
+        numbers = [int(r["id"].rsplit("_", 1)[1]) for r in kept + pruned]
+        self.next_number = max(numbers, default=0) + 1
         if kept:
             self.log(f"resuming after round {done}: {len(kept)} prompts kept")
-            self.index.add_batch([(r["id"], self._masked(r)) for r in kept])
-            for row in kept:
-                self._register(row)
+            verdicts = self.index.add_batch([self._dedup_item(r) for r in kept])
+            removed = []
+            for row, verdict in zip(kept, verdicts):
+                if verdict.status == KEPT:
+                    self._register(row)
+                else:
+                    removed.append({**row, "status": verdict.status, "duplicate_of": verdict.duplicate_of,
+                                    "similarity": verdict.similarity, "pruned_after_round": done})
+            if removed:
+                # The deduplication rule changed since these prompts were kept.
+                self.log(f"pruned {len(removed)} kept prompts that are duplicates under the current rule")
+                _append_jsonl(self.path("pruned.jsonl"), removed)
+                _write_jsonl(self.path("safe_prompts.jsonl"), self.kept)
+                self.pruned_after_round = done
 
-    def _masked(self, row: dict[str, Any]) -> str:
-        return mask_document(row["text"], self.by_id[row["context_id"]].mask_terms())
+    def _dedup_item(self, row: dict[str, Any]) -> tuple[str, str, str]:
+        """(id, text for the exact key, text for the embedding); see DedupIndex.add_batch."""
+        masked = mask_document(row["text"], self.by_id[row["context_id"]].mask_terms())
+        return row.get("id") or row["candidate_id"], masked, row["text"]
 
     def _register(self, row: dict[str, Any]) -> None:
         self.kept.append(row)
@@ -281,7 +301,7 @@ class GenerationRun:
                 stats["filtered"] += 1
             else:
                 to_check.append(cand)
-        verdicts = self.index.add_batch([(c["candidate_id"], self._masked(c)) for c in to_check])
+        verdicts = self.index.add_batch([self._dedup_item(c) for c in to_check])
 
         new_rows = []
         for cand, verdict in zip(to_check, verdicts):
@@ -292,7 +312,7 @@ class GenerationRun:
             # A context over its quota still contributes what it generated in
             # this round: dropping valid prompts would waste them.
             row = {
-                "id": f"SP2_{len(self.kept) + 1:06d}",
+                "id": f"SP2_{self.next_number:06d}",
                 "candidate_id": cand["candidate_id"],
                 "round": round_no,
                 "context_id": cand["context_id"],
@@ -307,6 +327,7 @@ class GenerationRun:
                 "text": cand["text"],
                 "sha256": sha256_hex(cand["text"]),
             }
+            self.next_number += 1
             self._register(row)
             new_rows.append(row)
         kept_ids = {r["candidate_id"]: r["id"] for r in new_rows}
@@ -349,7 +370,9 @@ class GenerationRun:
             return "every context reached its quota"
         if len(self.rounds) >= self.config.max_rounds:
             return "max_rounds reached"
-        if self.rounds:
+        # A prune on resume reopens contexts: the yield of the rounds before it
+        # no longer says whether the generator is saturated.
+        if self.rounds and len(self.rounds) > self.pruned_after_round:
             last = self.rounds[-1]
             if last["yield"] != "" and float(last["yield"]) < self.config.min_yield:
                 return f"saturation: last round kept {float(last['yield']):.1%} of what it generated"
@@ -392,6 +415,7 @@ class GenerationRun:
             "quota_per_context": self.quota,
             "rounds": len(self.rounds),
             "kept": len(self.kept),
+            "pruned_on_resume": len(_read_jsonl(self.path("pruned.jsonl"))),
             "kept_by_kind": dict(Counter(r["kind"] for r in self.kept)),
             "kept_by_domain": dict(Counter(r["domain"] for r in self.kept)),
             "kept_by_family": dict(Counter(r["family"] for r in self.kept)),

@@ -98,30 +98,35 @@ class DedupIndex:
     def _exact_target(self, key: str) -> str | None:
         return self._keys.get(key) or self._redirect.get(key)
 
-    def add_batch(self, items: Sequence[tuple[str, str]]) -> list[Verdict]:
-        """Check ``(item_id, masked_key_text)`` pairs in order; keep the new ones.
+    def add_batch(self, items: Sequence[tuple[str, ...]]) -> list[Verdict]:
+        """Check ``(item_id, key_text[, embed_text])`` items in order; keep the new ones.
 
-        ``masked_key_text`` is the text used for comparison (document name
-        already masked). Returns one verdict per item. ``duplicate_of`` always
-        names a kept prompt.
+        ``key_text`` gives the exact key (document name already masked).
+        ``embed_text`` is the text embedded for near duplicates; it defaults to
+        ``key_text``. The pipeline embeds the full text: masking the document
+        name also removes the topic words ("campus safety incident log"), which
+        lowers the cosine of two rewordings below a threshold calibrated on
+        full texts. Returns one verdict per item. ``duplicate_of`` always names
+        a kept prompt.
         """
         verdicts: list[Verdict] = []
         for start in range(0, len(items), self.chunk_size):
             verdicts += self._add_chunk(items[start : start + self.chunk_size])
         return verdicts
 
-    def _add_chunk(self, items: Sequence[tuple[str, str]]) -> list[Verdict]:
-        keys = [exact_key(text) for _, text in items]
+    def _add_chunk(self, items: Sequence[tuple[str, ...]]) -> list[Verdict]:
+        keys = [exact_key(item[1]) for item in items]
         vectors = old_sims = new_sims = None
         if self.embed is not None:
-            vectors = self.embed([text for _, text in items])
+            vectors = self.embed([item[-1] for item in items])
             kept = self._kept_matrix()
             old_sims = vectors @ kept.T if kept is not None and len(kept) else None
             new_sims = vectors @ vectors.T
 
         verdicts: list[Verdict] = []
         accepted: list[int] = []  # positions in this chunk kept so far
-        for i, ((item_id, _), key) in enumerate(zip(items, keys)):
+        for i, (item, key) in enumerate(zip(items, keys)):
+            item_id = item[0]
             target = self._exact_target(key)
             if target is not None:
                 verdicts.append(Verdict(EXACT_DUPLICATE, target, 1.0))

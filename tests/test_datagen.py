@@ -211,6 +211,26 @@ def test_resume_reuses_answers_and_state(tmp_path):
     assert gen.calls == first_calls + 2  # only round 2 was generated
 
 
+def test_resume_prunes_with_a_stricter_rule_then_tops_up(tmp_path):
+    _, contexts = contexts_two()
+    # min_yield above 1 would stop any run at saturation after its first round.
+    config = GenerationConfig(out_dir=tmp_path, target=1000, per_call=5, max_rounds=1, min_yield=1.01)
+    gen = FakeGenerator()
+    GenerationRun(config, contexts, embed=None, log=lambda _m: None).run(gen)
+    config.max_rounds, config.near_threshold = 2, 0.7
+    resumed = GenerationRun(config, contexts, embed=bow_embed, log=lambda _m: None)
+    pruned = [json.loads(line) for line in (tmp_path / "pruned.jsonl").read_text().splitlines()]
+    assert pruned and len(resumed.kept) + len(pruned) == 8
+    assert {p["status"] for p in pruned} == {NEAR_DUPLICATE}
+    on_disk = [json.loads(line) for line in (tmp_path / "safe_prompts.jsonl").read_text().splitlines()]
+    assert [r["id"] for r in on_disk] == [r["id"] for r in resumed.kept]
+    # The prune reopens the contexts, so round 2 runs despite min_yield.
+    resumed.run(gen)
+    assert len(resumed.rounds) == 2
+    ids = [r["id"] for r in resumed.kept] + [p["id"] for p in pruned]
+    assert len(ids) == len(set(ids))
+
+
 def test_failed_and_refused_answers_are_counted_not_kept(tmp_path):
     _, contexts = contexts_two()
 

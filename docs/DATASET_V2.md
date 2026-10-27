@@ -48,8 +48,13 @@ Code: `src/prompt_forensics/datagen/`, command line:
    must also avoid attack vocabulary ("bypass", "system prompt",
    "role-play", ...).
 5. **Deduplication.** Exact (normalised text, document name masked) and
-   near-duplicate (raw cosine of `gte-large-en-v1.5` embeddings >= 0.90)
-   against every prompt kept so far. The first occurrence is kept.
+   near-duplicate (raw cosine of `gte-large-en-v1.5` embeddings of the full
+   text >= 0.88, calibrated on the 300-prompt pilot) against every prompt
+   kept so far. The first occurrence is kept. The embeddings are not taken on
+   the masked text: masking also removes the topic words, which hides
+   rewordings (0.97 on the full texts, 0.87 masked). Resuming a run checks
+   the kept prompts again with the current rule; the ones it rejects go to
+   `pruned.jsonl` and the next rounds top up.
 6. **Stopping rule.** Rounds continue until the target is reached or a round
    keeps less than 10 % of what it generated (saturation). `rounds.csv`
    gives the saturation curve (distinct prompts kept per round).
