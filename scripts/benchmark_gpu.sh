@@ -67,6 +67,9 @@ serve() {  # model, GPU memory share, extra vllm options
     done
 }
 
+# On any error, do not leave a server holding the GPU.
+trap '[ -n "${VLLM_PID:-}" ] && kill "$VLLM_PID" 2> /dev/null' EXIT
+
 stop() {
     kill "$VLLM_PID"
     wait "$VLLM_PID" 2> /dev/null || true
