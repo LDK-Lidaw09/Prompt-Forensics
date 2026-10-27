@@ -28,6 +28,8 @@ export EMBED_DEVICE=cuda EMBED_BATCH_SIZE=64
 
 mkdir -p "$OUT"
 
+# hf_transfer: RunPod images set HF_HUB_ENABLE_HF_TRANSFER=1, and every
+# model download fails without the package.
 # Two virtual environments. pip cannot replace the Debian packages of the pod
 # image (PyJWT, ...), and vLLM needs other transformers versions than the
 # project: gte-large-en-v1.5 breaks under transformers 5.
@@ -42,9 +44,9 @@ make_venv .venv-vllm
 make_venv .venv
 if [ "${SKIP_INSTALL:-0}" != 1 ]; then
     .venv-vllm/bin/pip install -q --upgrade pip
-    .venv-vllm/bin/pip install -q "vllm==$VLLM_VERSION" "transformers<5"
+    .venv-vllm/bin/pip install -q "vllm==$VLLM_VERSION" "transformers<5" hf_transfer
     .venv/bin/pip install -q --upgrade pip
-    .venv/bin/pip install -q -e ".[ml]"
+    .venv/bin/pip install -q -e ".[ml]" hf_transfer
 fi
 # shellcheck disable=SC1091
 . .venv/bin/activate
