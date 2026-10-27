@@ -22,15 +22,19 @@ Each shard runs, on one GPU:
 1. the replays with `mistralai/Mistral-7B-Instruct-v0.3` (temperature 0.2,
    seed 1234 + i, 512 tokens), with Consistency and Fidelity from the raw
    cosine of `gte-large-en-v1.5` embeddings and from BERTScore;
-2. the Evaluator (`Qwen/Qwen3-14B`, blind to the attack family) on every
-   replay;
-3. the LLM-as-Investigator with the five judges of the thesis, served one
-   after the other. `microsoft/Phi-4-reasoning` gets 4,096 output tokens
+2. the same deep-pool prompts replayed 10 times with a second victim,
+   `meta-llama/Llama-3.1-8B-Instruct`, better aligned than Mistral-7B and the
+   usual victim of jailbreak benchmarks, to check that the results do not
+   hold for one model only (`VICTIM2=` skips it);
+3. the Evaluator (`Qwen/Qwen3-14B`, blind to the attack family) on every
+   replay of both victims;
+4. the LLM-as-Investigator on the first victim, with the five judges of
+   the thesis, served one after the other. `microsoft/Phi-4-reasoning` gets 4,096 output tokens
    instead of 640, which cut its reasoning before the verdict.
 
 Estimated cost from the A100 benchmark of 2026-10-27: about 42 GPU hours of
-replays and Evaluator per shard, plus about 7 hours of Investigator, so two
-days per GPU.
+replays and Evaluator per shard, about 2 hours for the second victim and
+about 7 hours of Investigator, so two days per GPU.
 
 ## Running
 
@@ -61,6 +65,7 @@ deleted.
 |---|---|
 | `replays_<mode>_r<n>.jsonl` | every replay (text, seed, model, timing) |
 | `replays_<mode>_r<n>.csv` | Consistency and Fidelity per prompt |
+| `replays_<mode>_r10_llama-3_1-8b-instruct.*` | the same for the second victim |
 | `evaluator.csv` | safe/unsafe verdict of every replay |
 | `investigator_<mode>_r<n>_<judge>.csv` | Investigator report per prompt and judge |
 | `steps.log`, `environment.txt`, `vllm_*.log` | timings, GPU, vLLM version, commit |

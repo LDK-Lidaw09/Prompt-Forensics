@@ -4,7 +4,9 @@
 # Per shard, in order:
 #   1. replays with the victim model (deep pools: 100 replays, shallow: 10),
 #      with Consistency / Fidelity (cosine + BERTScore);
-#   2. Evaluator (Qwen3-14B) on every replay;
+#   1b. replays of the deep-pool prompts with a second victim (Llama-3.1-8B,
+#      10 replays), to check that the results do not hold for one model only;
+#   2. Evaluator (Qwen3-14B) on every replay of both victims;
 #   3. LLM-as-Investigator, five judges, one served at a time.
 #
 # Run from the repository root on a pod with one GPU (80 GB) and 150 GB of
@@ -20,7 +22,8 @@
 # shard are packed in results/v2/shard<k>.tar.gz.
 #
 # Settings (environment): SHARDS (2), DEEP (5000 prompts), DEEP_REPLAYS (100),
-# REPLAYS (10), SKIP_INSTALL=1, JUDGES (space-separated model ids).
+# REPLAYS (10), VICTIM2 (empty to skip step 1b), VICTIM2_REPLAYS (10),
+# SKIP_INSTALL=1, JUDGES (space-separated model ids).
 set -euo pipefail
 
 SHARD=${1:?usage: run_gpu_shard.sh SHARD (0, 1, ...)}
@@ -32,6 +35,9 @@ ROOT=data/scenarios_v2
 PLAN=results/v2/plan
 OUT=results/v2/shard$SHARD
 VICTIM=mistralai/Mistral-7B-Instruct-v0.3
+# Better aligned than Mistral-7B and the usual victim of jailbreak benchmarks.
+VICTIM2=${VICTIM2-meta-llama/Llama-3.1-8B-Instruct}
+VICTIM2_REPLAYS=${VICTIM2_REPLAYS:-10}
 EVALUATOR=Qwen/Qwen3-14B
 # Investigator judges of the thesis; the Evaluator model comes first so that
 # it is served only once.
@@ -68,7 +74,7 @@ fi
 
 # Fail now, not after 40 hours, if a gated model has not been accepted on
 # huggingface.co with this token.
-python - $VICTIM $JUDGES <<'EOF'
+python - $VICTIM $VICTIM2 $JUDGES <<'EOF'
 import sys
 from huggingface_hub import hf_hub_download
 missing = []
@@ -115,7 +121,7 @@ fi
 POOLS=()  # "<run mode> <replays>" pairs of this shard
 for mode in attacks safe; do
     for n in "$DEEP_REPLAYS" "$REPLAYS"; do
-        [ -d "$PLAN/shard$SHARD/${mode}_r$n" ] && POOLS+=("$mode $n")
+        if [ -d "$PLAN/shard$SHARD/${mode}_r$n" ]; then POOLS+=("$mode $n"); fi
     done
 done
 
@@ -138,19 +144,45 @@ if ! done_step replays; then
 fi
 
 REPLAY_FILES=()
+EVAL_FILES=()
 for pool in "${POOLS[@]}"; do
     read -r mode n <<< "$pool"
     REPLAY_FILES+=("$OUT/replays_${mode}_r$n.jsonl")
+    EVAL_FILES+=("$OUT/replays_${mode}_r$n.jsonl")
 done
 
-# ---- 2 and 3. Evaluator, then the Investigator judges -------------------------------
+# ---- 1b. Second victim on the deep-pool prompts -----------------------------------
+if [ -n "$VICTIM2" ]; then
+    vtag=$(basename "$VICTIM2" | tr 'A-Z.' 'a-z_')
+    if ! done_step victim2; then
+        serve "$VICTIM2" 0.45
+        for mode in attacks safe; do
+            [ -d "$PLAN/shard$SHARD/${mode}_r$DEEP_REPLAYS" ] || continue
+            log "replays $mode x$VICTIM2_REPLAYS with $VICTIM2"
+            python scripts/run_replays.py --run-mode "$mode" --model "$VICTIM2" \
+                --scenario-root "$PLAN/shard$SHARD/${mode}_r$DEEP_REPLAYS" --num-replays "$VICTIM2_REPLAYS" \
+                --cosine-mapping raw --scenario-workers 16 --replay-workers 10 --max-inflight-calls 128 --resume \
+                --output-csv "$OUT/replays_${mode}_r${VICTIM2_REPLAYS}_$vtag.csv" \
+                --output-jsonl "$OUT/replays_${mode}_r${VICTIM2_REPLAYS}_$vtag.jsonl"
+        done
+        stop  # its weights stay on disk if it is also a judge
+        case " $JUDGES " in *" $VICTIM2 "*) ;; *) forget "$VICTIM2" ;; esac
+        mark_done victim2
+    fi
+    for mode in attacks safe; do
+        f="$OUT/replays_${mode}_r${VICTIM2_REPLAYS}_$vtag.jsonl"
+        if [ -f "$f" ]; then EVAL_FILES+=("$f"); fi
+    done
+fi
+
+# ---- 2 and 3. Evaluator, then the Investigator judges (first victim only) ----------
 for judge in $JUDGES; do
     tag=$(basename "$judge" | tr 'A-Z.' 'a-z_')
     done_step "judge_$tag" && { [ "$judge" != "$EVALUATOR" ] || done_step evaluator; } && continue
     serve "$judge" 0.9 "--guided-decoding-backend outlines"
     if [ "$judge" = "$EVALUATOR" ] && ! done_step evaluator; then
         log "evaluator"
-        python scripts/run_evaluator.py --input "${REPLAY_FILES[@]}" --judge-model "$EVALUATOR" \
+        python scripts/run_evaluator.py --input "${EVAL_FILES[@]}" --judge-model "$EVALUATOR" \
             --workers 64 --resume --output-csv "$OUT/evaluator.csv"
         mark_done evaluator
     fi
