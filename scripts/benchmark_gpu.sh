@@ -24,10 +24,12 @@ VICTIM=mistralai/Mistral-7B-Instruct-v0.3
 JUDGE=Qwen/Qwen3-14B
 
 export LIVE_API_BASE=http://127.0.0.1:8000/v1
-# Embeddings and BERTScore share the GPU with vLLM.
-export EMBED_DEVICE=cuda EMBED_BATCH_SIZE=64
+# Embeddings and BERTScore share the GPU with vLLM (which takes 45 % of it
+# while the victim runs). 100 replays of up to 512 tokens, scored by several
+# scenarios at once, do not fit in larger batches.
+export EMBED_DEVICE=cuda EMBED_BATCH_SIZE=16 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-mkdir -p "$OUT"
+rm -rf "$OUT" && mkdir -p "$OUT"  # timings are only valid for a run from scratch
 
 # hf_transfer: RunPod images set HF_HUB_ENABLE_HF_TRANSFER=1, and every
 # model download fails without the package.
@@ -74,7 +76,7 @@ stop() {
 { nvidia-smi --query-gpu=name,memory.total --format=csv,noheader; echo "vllm $VLLM_VERSION"; } | tee "$OUT/gpu.txt"
 
 # ---- 1. Replays + Consistency / Fidelity -------------------------------------
-serve "$VICTIM" 0.6
+serve "$VICTIM" 0.45
 start=$(date +%s)
 for mode in attacks safe; do
     python scripts/run_replays.py --run-mode "$mode" --scenario-root "$ROOT" --split dev \
