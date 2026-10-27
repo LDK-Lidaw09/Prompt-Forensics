@@ -28,25 +28,32 @@ export EMBED_DEVICE=cuda EMBED_BATCH_SIZE=64
 
 mkdir -p "$OUT"
 
-# A virtual environment: pip cannot replace the Debian packages of the pod
-# image (PyJWT, blinker, ...), and vLLM pins its own torch anyway.
-if [ ! -d .venv ]; then
-    python3 -m venv .venv || { rm -rf .venv; apt-get update -qq && apt-get install -y -qq python3-venv && python3 -m venv .venv; }
+# Two virtual environments. pip cannot replace the Debian packages of the pod
+# image (PyJWT, ...), and vLLM needs other transformers versions than the
+# project: gte-large-en-v1.5 breaks under transformers 5.
+# VLLM_VERSION default: the last series that still takes the guided_json
+# request field used by the judges.
+VLLM_VERSION=${VLLM_VERSION:-0.10.1.1}
+make_venv() {
+    [ -d "$1" ] && return
+    python3 -m venv "$1" || { rm -rf "$1"; apt-get update -qq && apt-get install -y -qq python3-venv && python3 -m venv "$1"; }
+}
+make_venv .venv-vllm
+make_venv .venv
+if [ "${SKIP_INSTALL:-0}" != 1 ]; then
+    .venv-vllm/bin/pip install -q --upgrade pip
+    .venv-vllm/bin/pip install -q "vllm==$VLLM_VERSION" "transformers<5"
+    .venv/bin/pip install -q --upgrade pip
+    .venv/bin/pip install -q -e ".[ml]"
 fi
 # shellcheck disable=SC1091
 . .venv/bin/activate
-if [ "${SKIP_INSTALL:-0}" != 1 ]; then
-    pip install -q --upgrade pip
-    # vLLM first: it pins its own torch; the project then adds what it needs.
-    pip install -q vllm
-    pip install -q -e ".[ml]"
-fi
 if [ -z "${HF_TOKEN:-}" ]; then
     echo "HF_TOKEN is not set (export HF_TOKEN=hf_..., no space after =)"; exit 1
 fi
 
-serve() {  # model, GPU memory share
-    vllm serve "$1" --port 8000 --gpu-memory-utilization "$2" --max-model-len 8192 \
+serve() {  # model, GPU memory share, extra vllm options
+    .venv-vllm/bin/vllm serve "$1" --port 8000 --gpu-memory-utilization "$2" --max-model-len 8192 ${3:-} \
         > "$OUT/vllm_${1##*/}.log" 2>&1 &
     VLLM_PID=$!
     until curl -sf "$LIVE_API_BASE/models" > /dev/null; do
@@ -61,7 +68,7 @@ stop() {
     sleep 10  # let the GPU memory go
 }
 
-nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | tee "$OUT/gpu.txt"
+{ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader; echo "vllm $VLLM_VERSION"; } | tee "$OUT/gpu.txt"
 
 # ---- 1. Replays + Consistency / Fidelity -------------------------------------
 serve "$VICTIM" 0.6
@@ -88,7 +95,9 @@ print(f"bert_pairs_per_s={len(pairs) / (time.time() - start):.1f}")
 EOF
 
 # ---- 2. Evaluator on every replay ----------------------------------------------
-serve "$JUDGE" 0.9
+# The judges ask for JSON with guided_json and the outlines backend; the
+# engine must use the same backend.
+serve "$JUDGE" 0.9 "--guided-decoding-backend outlines"
 start=$(date +%s)
 python scripts/run_evaluator.py --input "$OUT/replays_attacks.jsonl" "$OUT/replays_safe.jsonl" \
     --judge-model "$JUDGE" --workers 64 --output-csv "$OUT/evaluator.csv"
