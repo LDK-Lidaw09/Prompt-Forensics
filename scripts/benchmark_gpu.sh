@@ -28,10 +28,21 @@ export EMBED_DEVICE=cuda EMBED_BATCH_SIZE=64
 
 mkdir -p "$OUT"
 
+# A virtual environment: pip cannot replace the Debian packages of the pod
+# image (PyJWT, blinker, ...), and vLLM pins its own torch anyway.
+if [ ! -d .venv ]; then
+    python3 -m venv .venv
+fi
+# shellcheck disable=SC1091
+. .venv/bin/activate
 if [ "${SKIP_INSTALL:-0}" != 1 ]; then
+    pip install -q --upgrade pip
     # vLLM first: it pins its own torch; the project then adds what it needs.
     pip install -q vllm
     pip install -q -e ".[ml]"
+fi
+if [ -z "${HF_TOKEN:-}" ]; then
+    echo "HF_TOKEN is not set (export HF_TOKEN=hf_..., no space after =)"; exit 1
 fi
 
 serve() {  # model, GPU memory share
