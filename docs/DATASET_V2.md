@@ -66,8 +66,23 @@ Code: `src/prompt_forensics/datagen/`, command line:
    kind. The sheet shows the system prompt, the document and the prompt only;
    the key (kind, task) is kept apart, so annotators do not know which items
    are hard negatives. Two annotators label each item `legitimate`,
-   `not_legitimate` or `unclear`; report Cohen's kappa and the share of
-   `legitimate`.
+   `not_legitimate` or `unclear` (`oui`/`non`/`uncertain` are read as the
+   same labels). `agreement` reports the observed agreement, Cohen's kappa
+   and Gwet's AC1: when nearly every item is legitimate, kappa collapses
+   towards 0 even with high agreement, and AC1 does not.
+9. **Adjudication.** A prompt stays in the safe set only if both annotators
+   labelled it `legitimate`. `exclude` moves the others from
+   `safe_prompts.jsonl` to `excluded.jsonl` with the item id and the reason;
+   run `assemble` again afterwards. `agreement` still counts excluded items,
+   since they were annotated.
+
+   Result of the 2026 annotation (475 items analysed, 25 pruned before):
+   observed agreement 98.1 %, Cohen's kappa 0 (the second annotator labelled
+   every item legitimate), Gwet's AC1 0.981. The 9 prompts labelled
+   `not_legitimate` by one annotator (items A0083, A0143, A0226, A0241,
+   A0249, A0355, A0372, A0406, A0447) were excluded: 19,981 safe prompts and
+   23,376 scenarios remain (18,205 with both prompts, 3,395 attack only,
+   1,776 safe only; safe prompts dev 2,997 / test 16,984).
 
 ## Traceability
 

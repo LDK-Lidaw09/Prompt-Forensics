@@ -44,6 +44,12 @@ KEY_FIELDS = ["item", "safe_prompt_id", "domain", "family", "kind", "task"]
 _SAFE_NAME = re.compile(r"[A-Za-z0-9_-]+")
 LABELS = ("legitimate", "not_legitimate", "unclear")
 LABELS_HELP = "label: " + " | ".join(LABELS)
+# Other spellings found in returned sheets (French, yes/no).
+LABEL_ALIASES = {
+    "oui": "legitimate", "yes": "legitimate", "legitime": "legitimate", "légitime": "legitimate",
+    "non": "not_legitimate", "no": "not_legitimate",
+    "uncertain": "unclear", "incertain": "unclear",
+}
 
 
 def split_of(doc_key: str, dev_fraction: float, seed: int) -> str:
@@ -177,6 +183,24 @@ def annotation_sample(kept: Sequence[dict[str, Any]], contexts: dict[str, Contex
     return sheet, answer_key
 
 
+def exclude_prompts(kept: Sequence[dict[str, Any]], key_rows: Sequence[dict[str, str]],
+                    reason: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split ``kept`` into the prompts that stay and those named by ``key_rows``.
+
+    Used after adjudication of the human annotation: a prompt stays in the
+    safe set only if both annotators labelled it legitimate. Each excluded
+    row records the annotation item and the reason.
+    """
+    items = {row["safe_prompt_id"]: row["item"] for row in key_rows}
+    remaining, excluded = [], []
+    for row in kept:
+        if row["id"] in items:
+            excluded.append({**row, "annotation_item": items[row["id"]], "excluded_reason": reason})
+        else:
+            remaining.append(row)
+    return remaining, excluded
+
+
 def write_csv(rows: Sequence[dict[str, Any]], fields: Sequence[str], path: str | Path) -> None:
     with Path(path).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(fields))
@@ -222,6 +246,7 @@ def _label(value: str | None) -> str | None:
     label = re.sub(r"[\s-]+", "_", (value or "").strip().lower())
     if not label:
         return None
+    label = LABEL_ALIASES.get(label, label)
     if label not in LABELS:
         raise ValueError(f"unknown label {value!r} (expected {LABELS_HELP})")
     return label
@@ -238,6 +263,23 @@ def cohen_kappa(a: Sequence[str], b: Sequence[str]) -> float:
     return 1.0 if expected == 1 else (observed - expected) / (1 - expected)
 
 
+def gwet_ac1(a: Sequence[str], b: Sequence[str], categories: Sequence[str] = LABELS) -> float:
+    """Gwet's AC1 of two equally long label sequences over ``categories``.
+
+    Unlike kappa, its chance term does not approach the observed agreement
+    when nearly every item falls in one category, so it stays informative
+    when almost all prompts are labelled legitimate (Gwet, 2008).
+    """
+    n = len(a)
+    if n == 0:
+        return float("nan")
+    observed = sum(x == y for x, y in zip(a, b)) / n
+    counts = Counter(a) + Counter(b)
+    k = len(set(categories) | set(counts))
+    expected = sum((counts[c] / (2 * n)) * (1 - counts[c] / (2 * n)) for c in counts) / (k - 1)
+    return (observed - expected) / (1 - expected)
+
+
 def _agreement_stats(pairs: Sequence[tuple[str, str]]) -> dict[str, Any]:
     a, b = [x for x, _ in pairs], [y for _, y in pairs]
     n = len(pairs)
@@ -245,6 +287,7 @@ def _agreement_stats(pairs: Sequence[tuple[str, str]]) -> dict[str, Any]:
         "items": n,
         "observed_agreement": round(sum(x == y for x, y in pairs) / n, 4) if n else None,
         "cohen_kappa": round(cohen_kappa(a, b), 4) if n else None,
+        "gwet_ac1": round(gwet_ac1(a, b), 4) if n else None,
         "legitimate_a": round(a.count("legitimate") / n, 4) if n else None,
         "legitimate_b": round(b.count("legitimate") / n, 4) if n else None,
         # Both annotators say legitimate: the share reported as validated.

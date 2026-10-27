@@ -453,3 +453,27 @@ def test_agreement_reads_spreadsheet_csv_and_groups_by_kind(tmp_path):
     assert result["disagreements"] == ["A3"]
     with pytest.raises(ValueError):
         asm.agreement([{"item": "A1", "label": "maybe"}], [{"item": "A1", "label": "unclear"}], key)
+
+
+def test_gwet_ac1_stays_informative_when_one_rater_uses_one_label():
+    # 98 % agreement, rater b says "legitimate" every time: kappa is 0, AC1 is not.
+    a = ["legitimate"] * 98 + ["not_legitimate"] * 2
+    b = ["legitimate"] * 100
+    assert asm.cohen_kappa(a, b) == pytest.approx(0.0)
+    # pi = (198/200, 2/200, 0); pe = (0.99*0.01 + 0.01*0.99) / 2 = 0.0099
+    assert asm.gwet_ac1(a, b) == pytest.approx((0.98 - 0.0099) / (1 - 0.0099))
+    assert asm.gwet_ac1(a, a) == 1.0
+
+
+def test_label_aliases_from_returned_sheets():
+    result = asm.agreement([{"item": "A1", "label": "oui"}, {"item": "A2", "label": "Uncertain"}],
+                           [{"item": "A1", "label": "legitimate"}, {"item": "A2", "label": "unclear"}],
+                           [{"item": "A1"}, {"item": "A2"}])
+    assert result["disagreements"] == []
+
+
+def test_exclude_prompts_moves_annotated_items_with_reason():
+    kept = [{"id": "SP2_1", "text": "a"}, {"id": "SP2_2", "text": "b"}, {"id": "SP2_3", "text": "c"}]
+    remaining, excluded = asm.exclude_prompts(kept, [{"item": "A7", "safe_prompt_id": "SP2_2"}], "contested")
+    assert [r["id"] for r in remaining] == ["SP2_1", "SP2_3"]
+    assert excluded == [{"id": "SP2_2", "text": "b", "annotation_item": "A7", "excluded_reason": "contested"}]

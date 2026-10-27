@@ -8,7 +8,8 @@ Subcommands, in the order they are used:
     generate  generation rounds with filtering and deduplication (resumable)
     assemble  write the version 2 scenario files with the dev/test split
     sample    write the human annotation sheet and its key
-    agreement Cohen's kappa of two filled annotation sheets
+    agreement Cohen's kappa and Gwet's AC1 of two filled annotation sheets
+    exclude   remove annotated prompts from the dataset after adjudication
 
 Example (needs PF_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY):
 
@@ -18,6 +19,7 @@ Example (needs PF_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY):
     python scripts/generate_safe_prompts.py assemble --out data/safe_prompts_v2 --scenario-out data/scenarios_v2
     python scripts/generate_safe_prompts.py sample --out data/safe_prompts_v2 --size 500
     python scripts/generate_safe_prompts.py agreement --out data/safe_prompts_v2 annotator_a.csv annotator_b.csv
+    python scripts/generate_safe_prompts.py exclude --out data/safe_prompts_v2 --reason "..." A0083 A0143
 """
 
 import argparse
@@ -131,7 +133,10 @@ def cmd_agreement(args) -> None:
     out = Path(args.out)
     key = asm.read_csv(out / "annotation_key.csv")
     # Items whose prompt was pruned after the sample was drawn are left out.
+    # Prompts excluded after adjudication were annotated, so they stay in.
     current = {row["id"] for row in _read_jsonl(out / "safe_prompts.jsonl")}
+    if (out / "excluded.jsonl").exists():
+        current |= {row["id"] for row in _read_jsonl(out / "excluded.jsonl")}
     dropped = {row["item"] for row in key if row["safe_prompt_id"] not in current}
     sheets = [[row for row in asm.read_csv(path) if row["item"] not in dropped]
               for path in (args.sheet_a, args.sheet_b)]
@@ -141,6 +146,26 @@ def cmd_agreement(args) -> None:
     (out / "agreement.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k != "disagreements"}, indent=2))
     print(f"{len(result['disagreements'])} items labelled differently: see {out / 'agreement.json'}")
+
+
+def cmd_exclude(args) -> None:
+    out = Path(args.out)
+    key = {row["item"]: row for row in asm.read_csv(out / "annotation_key.csv")}
+    unknown = [item for item in args.items if item not in key]
+    if unknown:
+        raise SystemExit(f"items not in the annotation key: {', '.join(unknown)}")
+    kept = _read_jsonl(out / "safe_prompts.jsonl")
+    remaining, excluded = asm.exclude_prompts(kept, [key[item] for item in args.items], args.reason)
+    if not excluded:
+        raise SystemExit("none of these items is still in safe_prompts.jsonl")
+    with (out / "excluded.jsonl").open("a", encoding="utf-8") as f:
+        for row in excluded:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    tmp = out / "safe_prompts.jsonl.tmp"
+    tmp.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in remaining), encoding="utf-8")
+    tmp.replace(out / "safe_prompts.jsonl")
+    print(f"{len(excluded)} prompts moved to {out / 'excluded.jsonl'}; {len(remaining)} safe prompts left."
+          " Run assemble again to update the scenarios.")
 
 
 def main() -> None:
@@ -197,6 +222,12 @@ def main() -> None:
     p.add_argument("sheet_a", help="annotation sheet filled by the first annotator")
     p.add_argument("sheet_b", help="annotation sheet filled by the second annotator")
     p.set_defaults(func=cmd_agreement)
+
+    p = sub.add_parser("exclude", help="remove annotated prompts after adjudication")
+    p.add_argument("--out", required=True, help="directory of the generation run (holds the key)")
+    p.add_argument("--reason", required=True, help="why the prompts are removed (kept in excluded.jsonl)")
+    p.add_argument("items", nargs="+", help="annotation item ids, e.g. A0083")
+    p.set_defaults(func=cmd_exclude)
 
     args = parser.parse_args()
     args.func(args)
