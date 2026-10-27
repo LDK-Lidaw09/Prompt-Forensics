@@ -59,6 +59,16 @@ and the runs resume from their output files. At the end the results are in
 `results/v2/shard<k>.tar.gz`; download both archives before the pods are
 deleted.
 
+## Backup
+
+Every 30 minutes, and once more at the end, each shard copies its results
+folder to a private dataset repository on the Hugging Face Hub,
+`<token owner>/prompt-forensics-runs-v2` (`shard0/`, `shard1/`, `plan/`), with
+`scripts/backup_to_hf.py`. The token must have the write permission; the
+script checks it before the first replay. `HF_BACKUP_REPO` chooses another
+repository, `BACKUP=0` turns the backup off. The raw replays (several GB) stay
+on the Hub; only the aggregated tables go to this repository.
+
 ## Outputs (per shard)
 
 | File | Content |

@@ -21,9 +21,16 @@
 # and the runs resume from their output files. At the end, the results of the
 # shard are packed in results/v2/shard<k>.tar.gz.
 #
+# Backup: every 30 minutes and at the end, the results of the shard are
+# copied to a private dataset repository on the Hugging Face Hub
+# (<user>/prompt-forensics-runs-v2, or HF_BACKUP_REPO), so that nothing is
+# lost with a pod. HF_TOKEN then needs the write permission; BACKUP=0 turns
+# it off.
+#
 # Settings (environment): SHARDS (2), DEEP (5000 prompts), DEEP_REPLAYS (100),
 # REPLAYS (10), VICTIM2 (empty to skip step 1b), VICTIM2_REPLAYS (10),
-# SKIP_INSTALL=1, JUDGES (space-separated model ids).
+# SKIP_INSTALL=1, JUDGES (space-separated model ids), BACKUP (1),
+# HF_BACKUP_REPO, BACKUP_EVERY (seconds, 1800).
 set -euo pipefail
 
 SHARD=${1:?usage: run_gpu_shard.sh SHARD (0, 1, ...)}
@@ -97,7 +104,7 @@ serve() {  # model, GPU memory share, extra vllm options
     done
     log "serving $1"
 }
-trap '[ -n "${VLLM_PID:-}" ] && kill "$VLLM_PID" 2> /dev/null' EXIT
+trap '[ -n "${VLLM_PID:-}" ] && kill "$VLLM_PID" 2> /dev/null; [ -n "${BACKUP_PID:-}" ] && kill "$BACKUP_PID" 2> /dev/null' EXIT
 stop() {
     kill "$VLLM_PID"
     wait "$VLLM_PID" 2> /dev/null || true
@@ -116,6 +123,25 @@ if ! done_step plan; then
     python scripts/plan_gpu_runs.py --scenario-root "$ROOT" --out "$PLAN" --overwrite \
         --deep "$DEEP" --deep-replays "$DEEP_REPLAYS" --replays "$REPLAYS" --shards "$SHARDS"
     mark_done plan
+fi
+
+# ---- Backup to the Hugging Face Hub ---------------------------------------------
+backup() {
+    [ "${BACKUP:-1}" = 1 ] || return 0
+    python scripts/backup_to_hf.py "$OUT" --path-in-repo "shard$SHARD" ${HF_BACKUP_REPO:+--repo "$HF_BACKUP_REPO"} \
+        --message "shard $SHARD: $(tail -n 1 "$OUT/steps.log" 2> /dev/null | cut -c1-80)" >> "$OUT/backup.log" 2>&1
+}
+if [ "${BACKUP:-1}" = 1 ]; then
+    # The first copy also checks the token: better to stop now than to find
+    # out after two days that nothing was saved.
+    log "backup check"
+    if ! backup || ! python scripts/backup_to_hf.py "$PLAN" --path-in-repo plan \
+            ${HF_BACKUP_REPO:+--repo "$HF_BACKUP_REPO"} >> "$OUT/backup.log" 2>&1; then
+        echo "backup to the Hugging Face Hub failed (see $OUT/backup.log): HF_TOKEN needs the write permission, or set BACKUP=0"
+        exit 1
+    fi
+    ( while sleep "${BACKUP_EVERY:-1800}"; do backup || true; done ) &
+    BACKUP_PID=$!
 fi
 
 POOLS=()  # "<run mode> <replays>" pairs of this shard
@@ -205,3 +231,8 @@ done
 # ---- 4. Pack the results ---------------------------------------------------------------
 tar -czf "results/v2/shard$SHARD.tar.gz" -C results/v2 "shard$SHARD" plan
 log "finished: results/v2/shard$SHARD.tar.gz"
+if [ -n "${BACKUP_PID:-}" ]; then
+    kill "$BACKUP_PID" 2> /dev/null || true
+    BACKUP_PID=
+    backup && log "final backup done" || log "final backup FAILED, see $OUT/backup.log"
+fi
