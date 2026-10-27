@@ -8,6 +8,7 @@ Subcommands, in the order they are used:
     generate  generation rounds with filtering and deduplication (resumable)
     assemble  write the version 2 scenario files with the dev/test split
     sample    write the human annotation sheet and its key
+    agreement Cohen's kappa of two filled annotation sheets
 
 Example (needs PF_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY):
 
@@ -16,6 +17,7 @@ Example (needs PF_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY):
     python scripts/generate_safe_prompts.py generate --out data/safe_prompts_v2 --target 20000 --backend batch
     python scripts/generate_safe_prompts.py assemble --out data/safe_prompts_v2 --scenario-out data/scenarios_v2
     python scripts/generate_safe_prompts.py sample --out data/safe_prompts_v2 --size 500
+    python scripts/generate_safe_prompts.py agreement --out data/safe_prompts_v2 annotator_a.csv annotator_b.csv
 """
 
 import argparse
@@ -125,6 +127,16 @@ def cmd_sample(args) -> None:
     print(f"key (do not give to annotators) -> {out / 'annotation_key.csv'}")
 
 
+def cmd_agreement(args) -> None:
+    out = Path(args.out)
+    result = asm.agreement(asm.read_csv(args.sheet_a), asm.read_csv(args.sheet_b),
+                           asm.read_csv(out / "annotation_key.csv"))
+    result["sheets"] = [str(args.sheet_a), str(args.sheet_b)]
+    (out / "agreement.json").write_text(json.dumps(result, indent=2) + "\n")
+    print(json.dumps({k: v for k, v in result.items() if k != "disagreements"}, indent=2))
+    print(f"{len(result['disagreements'])} items labelled differently: see {out / 'agreement.json'}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--scenario-root", default=get_settings().scenario_root,
@@ -173,6 +185,12 @@ def main() -> None:
     p.add_argument("--out", required=True, help="directory of the generation run")
     p.add_argument("--size", type=int, default=500)
     p.set_defaults(func=cmd_sample)
+
+    p = sub.add_parser("agreement", help="agreement of two filled annotation sheets")
+    p.add_argument("--out", required=True, help="directory of the generation run (holds the key)")
+    p.add_argument("sheet_a", help="annotation sheet filled by the first annotator")
+    p.add_argument("sheet_b", help="annotation sheet filled by the second annotator")
+    p.set_defaults(func=cmd_agreement)
 
     args = parser.parse_args()
     args.func(args)

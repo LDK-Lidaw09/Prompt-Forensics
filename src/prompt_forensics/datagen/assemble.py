@@ -17,11 +17,15 @@ the same split.
 two CSV files: the sheet given to the annotators, which shows only what the
 victim model sees, and the key, which links each item to its prompt and its
 kind. Annotators therefore do not know which items are hard negatives.
+
+**Agreement.** Two filled sheets are compared with Cohen's kappa over the
+three labels, overall and per kind and domain (through the key).
 """
 
 from __future__ import annotations
 
 import csv
+import io
 import json
 import os
 import random
@@ -38,7 +42,8 @@ from .dedup import DedupIndex, EmbedFn, mask_document
 SHEET_FIELDS = ["item", "system_prompt", "document", "prompt", "label", "comment"]
 KEY_FIELDS = ["item", "safe_prompt_id", "domain", "family", "kind", "task"]
 _SAFE_NAME = re.compile(r"[A-Za-z0-9_-]+")
-LABELS_HELP = "label: legitimate | not_legitimate | unclear"
+LABELS = ("legitimate", "not_legitimate", "unclear")
+LABELS_HELP = "label: " + " | ".join(LABELS)
 
 
 def split_of(doc_key: str, dev_fraction: float, seed: int) -> str:
@@ -201,3 +206,81 @@ def audit_prompts(rows: Sequence[tuple[str, str, Sequence[str]]], embed: EmbedFn
             near.add_batch([(i, mask_document(t, terms)) for i, t, terms in rows[start:start + step]])
         report[f"distinct_after_near_dedup_{threshold}"] = len(near)
     return report
+
+
+def read_csv(path: str | Path) -> list[dict[str, str]]:
+    """Rows of a CSV file, also when a spreadsheet saved it with ';' and a BOM."""
+    text = Path(path).read_text(encoding="utf-8-sig")
+    header = text.split("\n", 1)[0]
+    delimiter = max(",;\t", key=header.count)
+    # StringIO, not splitlines(): cells (the documents) span several lines.
+    return list(csv.DictReader(io.StringIO(text, newline=""), delimiter=delimiter))
+
+
+def _label(value: str | None) -> str | None:
+    """Normalised label, ``None`` if empty; spaces, hyphens and case ignored."""
+    label = re.sub(r"[\s-]+", "_", (value or "").strip().lower())
+    if not label:
+        return None
+    if label not in LABELS:
+        raise ValueError(f"unknown label {value!r} (expected {LABELS_HELP})")
+    return label
+
+
+def cohen_kappa(a: Sequence[str], b: Sequence[str]) -> float:
+    """Cohen's kappa of two equally long label sequences."""
+    n = len(a)
+    if n == 0:
+        return float("nan")
+    observed = sum(x == y for x, y in zip(a, b)) / n
+    ca, cb = Counter(a), Counter(b)
+    expected = sum(ca[k] * cb[k] for k in set(ca) | set(cb)) / (n * n)
+    return 1.0 if expected == 1 else (observed - expected) / (1 - expected)
+
+
+def _agreement_stats(pairs: Sequence[tuple[str, str]]) -> dict[str, Any]:
+    a, b = [x for x, _ in pairs], [y for _, y in pairs]
+    n = len(pairs)
+    return {
+        "items": n,
+        "observed_agreement": round(sum(x == y for x, y in pairs) / n, 4) if n else None,
+        "cohen_kappa": round(cohen_kappa(a, b), 4) if n else None,
+        "legitimate_a": round(a.count("legitimate") / n, 4) if n else None,
+        "legitimate_b": round(b.count("legitimate") / n, 4) if n else None,
+        # Both annotators say legitimate: the share reported as validated.
+        "legitimate_both": round(sum(x == y == "legitimate" for x, y in pairs) / n, 4) if n else None,
+    }
+
+
+def agreement(sheet_a: Sequence[dict[str, str]], sheet_b: Sequence[dict[str, str]],
+              key: Sequence[dict[str, str]]) -> dict[str, Any]:
+    """Agreement of two filled annotation sheets, overall and per kind and domain.
+
+    Items left empty by either annotator are counted and left out.
+    """
+    labels_a = {row["item"]: _label(row.get("label")) for row in sheet_a}
+    labels_b = {row["item"]: _label(row.get("label")) for row in sheet_b}
+    if set(labels_a) != set(labels_b):
+        raise ValueError("the two sheets do not have the same items")
+    meta = {row["item"]: row for row in key}
+    pairs: dict[str, tuple[str, str]] = {}
+    missing = 0
+    for item in labels_a:
+        if labels_a[item] is None or labels_b[item] is None:
+            missing += 1
+        else:
+            pairs[item] = (labels_a[item], labels_b[item])
+
+    groups: dict[str, dict[str, list[tuple[str, str]]]] = {"kind": defaultdict(list), "domain": defaultdict(list)}
+    for item, pair in pairs.items():
+        for field, by_value in groups.items():
+            by_value[meta.get(item, {}).get(field, "?")].append(pair)
+    confusion = Counter(f"{x}/{y}" for x, y in pairs.values())
+    return {
+        "overall": _agreement_stats(list(pairs.values())),
+        "unlabelled_items": missing,
+        "by_kind": {k: _agreement_stats(v) for k, v in sorted(groups["kind"].items())},
+        "by_domain": {k: _agreement_stats(v) for k, v in sorted(groups["domain"].items())},
+        "confusion_a_b": dict(sorted(confusion.items())),
+        "disagreements": sorted(item for item, (x, y) in pairs.items() if x != y),
+    }

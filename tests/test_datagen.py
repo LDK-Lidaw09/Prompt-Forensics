@@ -403,3 +403,33 @@ def test_api_key_variable_order(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "host-key")
     monkeypatch.setenv("PF_ANTHROPIC_API_KEY", "script-key")
     assert generator.make_client().api_key == "script-key"
+
+
+# --------------------------------------------------------------- agreement
+def test_cohen_kappa_known_values():
+    assert asm.cohen_kappa(["a", "b", "a", "b"], ["a", "b", "a", "b"]) == 1.0
+    # 2x2 textbook case: po = 0.7, pe = 0.5, kappa = 0.4.
+    a = ["y"] * 5 + ["n"] * 5
+    b = ["y"] * 4 + ["n"] + ["y"] * 2 + ["n"] * 3
+    assert asm.cohen_kappa(a, b) == pytest.approx(0.4)
+
+
+def test_agreement_reads_spreadsheet_csv_and_groups_by_kind(tmp_path):
+    key = [{"item": "A1", "kind": STANDARD, "domain": "audit"},
+           {"item": "A2", "kind": STANDARD, "domain": "health"},
+           {"item": "A3", "kind": "hard_negative", "domain": "audit"},
+           {"item": "A4", "kind": "hard_negative", "domain": "audit"}]
+    # A French spreadsheet saves with ';' and a BOM.
+    path = tmp_path / "a.csv"
+    path.write_text("﻿item;prompt;label;comment\nA1;p;Legitimate;\nA2;p;legitimate;\n"
+                    "A3;\"two\nlines\";not legitimate;x\nA4;p;;\n", encoding="utf-8")
+    sheet_a = asm.read_csv(path)
+    sheet_b = [{"item": "A1", "label": "legitimate"}, {"item": "A2", "label": "legitimate"},
+               {"item": "A3", "label": "legitimate"}, {"item": "A4", "label": "unclear"}]
+    result = asm.agreement(sheet_a, sheet_b, key)
+    assert result["unlabelled_items"] == 1
+    assert result["overall"]["items"] == 3 and result["overall"]["observed_agreement"] == pytest.approx(2 / 3, abs=1e-4)
+    assert result["by_kind"][STANDARD]["cohen_kappa"] == 1.0
+    assert result["disagreements"] == ["A3"]
+    with pytest.raises(ValueError):
+        asm.agreement([{"item": "A1", "label": "maybe"}], [{"item": "A1", "label": "unclear"}], key)
