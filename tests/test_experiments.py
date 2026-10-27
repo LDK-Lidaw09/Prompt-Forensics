@@ -1,8 +1,10 @@
 """End-to-end runs of the batch experiments against the offline simulator."""
 
 import json
+from collections import Counter
 
 import pandas as pd
+import pytest
 
 from prompt_forensics.agents import investigator as investigator_agent
 from prompt_forensics.experiments.investigator import InvestigatorRunConfig, run_investigator
@@ -43,3 +45,53 @@ def test_replays_then_investigator(tmp_path, monkeypatch):
     # Resume: nothing left to do.
     assert run_investigator(InvestigatorRunConfig(replays=jsonl_path, output_csv=str(out), judge_model="j",
                                                   resume=True), progress=lambda m: None) == 0
+
+
+def _plan_scenarios():
+    out = []
+    for i in range(40):
+        out.append({
+            "id": f"S{i:03d}", "attack_type": ["jailbreak", "data_leakage"][i % 2],
+            "domain": "audit", "split": "test" if i % 4 else "dev",
+            "attack_prompt": f"attack {i}" if i % 5 else None,
+            "safe_prompt": f"safe {i}" if i % 3 else None,
+            "safe_kind": "hard_negative" if i % 7 == 0 else "standard",
+        })
+    return out
+
+
+def test_plan_runs_is_stratified_balanced_and_deterministic():
+    from prompt_forensics.experiments.plan import plan_runs
+
+    scenarios = _plan_scenarios()
+    rows = plan_runs(scenarios, deep=10, deep_replays=100, replays=10, shards=2, seed=1)
+    prompts = sum(bool(s["attack_prompt"]) + bool(s["safe_prompt"]) for s in scenarios)
+    assert len(rows) == prompts
+    assert len({(r["scenario_id"], r["run_mode"]) for r in rows}) == prompts
+    deep = [r for r in rows if r["pool"] == "deep"]
+    assert len(deep) == 10 and all(r["replays"] == 100 for r in deep)
+    assert all(r["replays"] == 10 for r in rows if r["pool"] == "shallow")
+    shard_counts = Counter(r["shard"] for r in deep)
+    assert abs(shard_counts[0] - shard_counts[1]) <= 2
+    assert all(r["safe_kind"] is None for r in rows if r["run_mode"] == "attacks")
+    assert rows == plan_runs(scenarios, deep=10, deep_replays=100, replays=10, shards=2, seed=1)
+    with pytest.raises(ValueError):
+        plan_runs(scenarios, deep=10_000)
+
+
+def test_write_plan_keeps_only_the_prompt_of_each_run_mode(tmp_path):
+    from prompt_forensics.experiments.plan import plan_runs, write_plan
+    from prompt_forensics.scenarios import load_scenarios
+
+    scenarios = _plan_scenarios()
+    rows = plan_runs(scenarios, deep=6, shards=2)
+    roots = write_plan(scenarios, rows, tmp_path)
+    assert (tmp_path / "plan.csv").exists()
+    total = 0
+    for root in roots:
+        mode = "attacks" if root.name.startswith("attacks") else "safe"
+        other = "safe_prompt" if mode == "attacks" else "attack_prompt"
+        loaded = load_scenarios(root)
+        assert loaded and all(s[other] is None for s in loaded)
+        total += len(loaded)
+    assert total == len(rows)
