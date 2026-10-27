@@ -129,8 +129,14 @@ def cmd_sample(args) -> None:
 
 def cmd_agreement(args) -> None:
     out = Path(args.out)
-    result = asm.agreement(asm.read_csv(args.sheet_a), asm.read_csv(args.sheet_b),
-                           asm.read_csv(out / "annotation_key.csv"))
+    key = asm.read_csv(out / "annotation_key.csv")
+    # Items whose prompt was pruned after the sample was drawn are left out.
+    current = {row["id"] for row in _read_jsonl(out / "safe_prompts.jsonl")}
+    dropped = {row["item"] for row in key if row["safe_prompt_id"] not in current}
+    sheets = [[row for row in asm.read_csv(path) if row["item"] not in dropped]
+              for path in (args.sheet_a, args.sheet_b)]
+    result = asm.agreement(*sheets, key)
+    result["items_no_longer_in_dataset"] = sorted(dropped)
     result["sheets"] = [str(args.sheet_a), str(args.sheet_b)]
     (out / "agreement.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k != "disagreements"}, indent=2))
