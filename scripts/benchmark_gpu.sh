@@ -5,7 +5,8 @@
 # them (cosine + BERTScore), judges every replay with the Evaluator, times each
 # step and extrapolates the GPU hours and the cost of the full runs.
 #
-# Run from the repository root on a pod with one GPU (80 GB or more):
+# Run from the repository root on a pod with one GPU (80 GB or more) and
+# 150 GB of disk (two models of about 30 GB each, two Python environments):
 #
 #     export HF_TOKEN=hf_...          # Mistral-7B-Instruct-v0.3 is gated
 #     PRICE=1.79 bash scripts/benchmark_gpu.sh
