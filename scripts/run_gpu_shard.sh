@@ -75,6 +75,15 @@ if [ "${SKIP_INSTALL:-0}" != 1 ] && ! done_step install; then
     .venv/bin/pip install -q -e ".[ml]" hf_transfer
     mark_done install
 fi
+# vLLM 0.10.1.1 recovers from the tokenizers "Invalid prefix encountered" error
+# only when the message matches exactly; recent tokenizers append the token,
+# so the error killed the whole server mid-run (shard 0, 2026-10-28). Match
+# the start of the message instead (the check later versions of vLLM use).
+detok=$(echo .venv-vllm/lib/python3*/site-packages/vllm/v1/engine/detokenizer.py)
+if [ -f "$detok" ]; then
+    sed -i 's/if str(e) != INVALID_PREFIX_ERR_MSG:/if not str(e).startswith(INVALID_PREFIX_ERR_MSG):/' "$detok"
+    grep -q 'startswith(INVALID_PREFIX_ERR_MSG)' "$detok" || { echo "could not patch $detok"; exit 1; }
+fi
 # shellcheck disable=SC1091
 . .venv/bin/activate
 if [ -z "${HF_TOKEN:-}" ]; then
@@ -100,6 +109,7 @@ serve() {  # model, GPU memory share, extra vllm options
     .venv-vllm/bin/vllm serve "$1" --port 8000 --gpu-memory-utilization "$2" --max-model-len 8192 ${3:-} \
         > "$OUT/vllm_${1##*/}.log" 2>&1 &
     VLLM_PID=$!
+    SERVE_ARGS=("$@")
     VLLM_LOG="$OUT/vllm_${1##*/}.log"
     until curl -sf "$LIVE_API_BASE/models" > /dev/null; do
         kill -0 "$VLLM_PID" 2> /dev/null || { echo "vLLM stopped, see $VLLM_LOG"; exit 1; }
@@ -108,9 +118,22 @@ serve() {  # model, GPU memory share, extra vllm options
     log "serving $1"
 }
 trap '[ -n "${VLLM_PID:-}" ] && kill "$VLLM_PID" 2> /dev/null; [ -n "${BACKUP_PID:-}" ] && kill "$BACKUP_PID" 2> /dev/null' EXIT
-alive() {  # after each run: a server that died mid-run leaves failed calls behind
-    kill -0 "$VLLM_PID" 2> /dev/null && return 0
-    log "vLLM stopped during the last run, see $VLLM_LOG; fix it and relaunch (--resume redoes the failed calls)"
+retry() {  # run a step; if vLLM died during it, restart vLLM and resume the step
+    local try
+    for try in 1 2 3 4 5; do
+        if "$@"; then
+            kill -0 "$VLLM_PID" 2> /dev/null && return 0
+        elif kill -0 "$VLLM_PID" 2> /dev/null; then
+            return 1  # the step failed although the server is up: a real error
+        fi
+        # Every step runs with --resume, so failed calls are redone, done ones kept.
+        log "vLLM stopped during the step (see $VLLM_LOG.crash$try), restart $try/5"
+        mv "$VLLM_LOG" "$VLLM_LOG.crash$try"
+        wait "$VLLM_PID" 2> /dev/null || true
+        sleep 10
+        serve "${SERVE_ARGS[@]}"
+    done
+    log "vLLM keeps stopping, giving up"
     exit 1
 }
 stop() {
@@ -168,10 +191,9 @@ if ! done_step replays; then
         else workers="--scenario-workers 16 --replay-workers 10"; fi
         log "replays $mode x$n"
         # shellcheck disable=SC2086
-        python scripts/run_replays.py --run-mode "$mode" --scenario-root "$PLAN/shard$SHARD/${mode}_r$n" \
+        retry python scripts/run_replays.py --run-mode "$mode" --scenario-root "$PLAN/shard$SHARD/${mode}_r$n" \
             --num-replays "$n" --cosine-mapping raw $workers --max-inflight-calls 128 --resume \
             --output-csv "$OUT/replays_${mode}_r$n.csv" --output-jsonl "$OUT/replays_${mode}_r$n.jsonl"
-        alive
     done
     # Whitespace experiment: the same prompts as is and with extra spacing
     # that the canonical form removes, same seeds (see experiments/plan.py).
@@ -180,10 +202,9 @@ if ! done_step replays; then
             root="$PLAN/shard$SHARD/ws_${mode}_$variant"
             [ -d "$root" ] || continue
             log "whitespace $mode $variant"
-            python scripts/run_replays.py --run-mode "$mode" --scenario-root "$root" --num-replays "$REPLAYS" \
+            retry python scripts/run_replays.py --run-mode "$mode" --scenario-root "$root" --num-replays "$REPLAYS" \
                 --cosine-mapping raw --scenario-workers 16 --replay-workers 10 --max-inflight-calls 128 --resume \
                 --output-csv "$OUT/whitespace_${mode}_$variant.csv" --output-jsonl "$OUT/whitespace_${mode}_$variant.jsonl"
-            alive
         done
     done
     stop
@@ -211,12 +232,11 @@ if [ -n "$VICTIM2" ]; then
         for mode in attacks safe; do
             [ -d "$PLAN/shard$SHARD/${mode}_r$DEEP_REPLAYS" ] || continue
             log "replays $mode x$VICTIM2_REPLAYS with $VICTIM2"
-            python scripts/run_replays.py --run-mode "$mode" --model "$VICTIM2" \
+            retry python scripts/run_replays.py --run-mode "$mode" --model "$VICTIM2" \
                 --scenario-root "$PLAN/shard$SHARD/${mode}_r$DEEP_REPLAYS" --num-replays "$VICTIM2_REPLAYS" \
                 --cosine-mapping raw --scenario-workers 16 --replay-workers 10 --max-inflight-calls 128 --resume \
                 --output-csv "$OUT/replays_${mode}_r${VICTIM2_REPLAYS}_$vtag.csv" \
                 --output-jsonl "$OUT/replays_${mode}_r${VICTIM2_REPLAYS}_$vtag.jsonl"
-            alive
         done
         stop  # its weights stay on disk if it is also a judge
         case " $JUDGES " in *" $VICTIM2 "*) ;; *) forget "$VICTIM2" ;; esac
@@ -235,9 +255,8 @@ for judge in $JUDGES; do
     serve "$judge" 0.9 "--guided-decoding-backend outlines"
     if [ "$judge" = "$EVALUATOR" ] && ! done_step evaluator; then
         log "evaluator"
-        python scripts/run_evaluator.py --input "${EVAL_FILES[@]}" --judge-model "$EVALUATOR" \
+        retry python scripts/run_evaluator.py --input "${EVAL_FILES[@]}" --judge-model "$EVALUATOR" \
             --workers 64 --resume --output-csv "$OUT/evaluator.csv"
-        alive
         mark_done evaluator
     fi
     # Phi-4-reasoning writes its reasoning before the answer; 640 tokens cut
@@ -247,10 +266,9 @@ for judge in $JUDGES; do
     for pool in "${POOLS[@]}"; do
         read -r mode n <<< "$pool"
         log "investigator $tag on $mode x$n"
-        python scripts/run_investigator.py --replays "$OUT/replays_${mode}_r$n.jsonl" --judge "$judge" \
+        retry python scripts/run_investigator.py --replays "$OUT/replays_${mode}_r$n.jsonl" --judge "$judge" \
             --scenario-root "$ROOT" --max-tokens "$max_tokens" --workers 32 --resume \
             --output-csv "$OUT/investigator_${mode}_r${n}_$tag.csv"
-        alive
     done
     stop
     forget "$judge"

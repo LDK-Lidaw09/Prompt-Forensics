@@ -142,3 +142,11 @@ def test_whitespace_roots_pair_original_and_perturbed(tmp_path):
     orig = {s["id"]: s for r in roots if r.name.endswith("orig") for s in load_scenarios(r)}
     pert = {s["id"]: s for r in roots if r.name.endswith("pert") for s in load_scenarios(r)}
     assert orig.keys() == pert.keys() and len(orig) == 4
+
+
+def test_evaluator_resume_judges_failed_calls_again(tmp_path):
+    from prompt_forensics.experiments.evaluate import _already_judged
+
+    path = tmp_path / "evaluator.csv"
+    pd.DataFrame({"output_key": ["a", "b"], "judge_ok": [True, False]}).to_csv(path, index=False)
+    assert _already_judged(str(path)) == {"a"}
