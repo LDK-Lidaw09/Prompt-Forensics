@@ -15,11 +15,41 @@ first use.
 """
 
 import argparse
+import fnmatch
+import os
+import shutil
 import sys
+import tempfile
 
 from huggingface_hub import HfApi
 
 DEFAULT_NAME = "prompt-forensics-runs-v2"
+# Markers and archives are rebuilt from the rest.
+IGNORE = [".done_*", "*.tar.gz"]
+
+
+def snapshot(folder: str, dest: str) -> None:
+    """Copy ``folder`` to ``dest``, each file cut at the size it had when listed.
+
+    The runs keep appending to their JSONL files; uploading a file that grows
+    during the upload makes the Hub reject the commit ("LFS pointer pointed to
+    a file that does not exist"). The copy is a fixed prefix of each file.
+    """
+    for root, _, files in os.walk(folder):
+        for name in files:
+            if any(fnmatch.fnmatch(name, pattern) for pattern in IGNORE):
+                continue
+            src = os.path.join(root, name)
+            dst = os.path.join(dest, os.path.relpath(src, folder))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(src, "rb") as reader, open(dst, "wb") as writer:
+                remaining = os.path.getsize(src)
+                while remaining > 0:
+                    chunk = reader.read(min(remaining, 1 << 24))
+                    if not chunk:
+                        break
+                    writer.write(chunk)
+                    remaining -= len(chunk)
 
 
 def main() -> None:
@@ -33,12 +63,17 @@ def main() -> None:
     api = HfApi()
     repo = args.repo or f"{api.whoami()['name']}/{DEFAULT_NAME}"
     api.create_repo(repo, repo_type="dataset", private=True, exist_ok=True)
-    api.upload_folder(
-        repo_id=repo, repo_type="dataset", folder_path=args.folder,
-        path_in_repo=args.path_in_repo, commit_message=args.message,
-        # Markers and archives are rebuilt from the rest.
-        ignore_patterns=[".done_*", "*.tar.gz"],
-    )
+    # The snapshot sits next to the folder (same disk, the pod volume).
+    parent = os.path.dirname(os.path.abspath(args.folder))
+    copy = tempfile.mkdtemp(prefix=".backup_", dir=parent)
+    try:
+        snapshot(args.folder, copy)
+        api.upload_folder(
+            repo_id=repo, repo_type="dataset", folder_path=copy,
+            path_in_repo=args.path_in_repo, commit_message=args.message,
+        )
+    finally:
+        shutil.rmtree(copy, ignore_errors=True)
     print(f"{args.folder} -> https://huggingface.co/datasets/{repo}/tree/main/{args.path_in_repo}")
 
 
