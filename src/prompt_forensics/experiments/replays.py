@@ -269,6 +269,12 @@ def run_replays(cfg: ReplayConfig, progress: Callable[[str], None] = print) -> t
                                        semaphore, existing): i for i in range(cfg.num_replays)}
                 for future in as_completed(futures):
                     outputs[futures[future]] = future.result()
+            if all(text is None for text in outputs):
+                # Every call failed: the model server is most likely down. Stop
+                # instead of filling the table with empty pools.
+                raise RuntimeError(f"all {cfg.num_replays} replays of {scenario_id(scenario)} failed; "
+                                   f"is {cfg.target_model} still served? (see the error field in "
+                                   f"{cfg.output_jsonl})")
             with metrics_lock:
                 robust = compute_replay_robustness(
                     outputs, cfg.threshold, cfg.threshold,

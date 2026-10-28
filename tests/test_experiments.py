@@ -51,6 +51,23 @@ def test_replays_then_investigator(tmp_path, monkeypatch):
                                                   resume=True), progress=lambda m: None) == 0
 
 
+def test_replays_stop_when_the_model_server_is_down(tmp_path, monkeypatch):
+    from prompt_forensics.experiments import replays
+    from prompt_forensics.llm import LLMError
+
+    def down(prompt, model, params):
+        raise LLMError("vllm: cannot reach http://localhost:8000/v1/chat/completions")
+
+    fake_metrics(monkeypatch)
+    monkeypatch.setattr(replays, "call_llm", down)
+    with pytest.raises(RuntimeError, match="all 3 replays"):
+        run_replays(ReplayConfig(
+            run_mode="attacks", limit=2, num_replays=3, target_model="sim:victim",
+            output_csv=str(tmp_path / "r.csv"), output_jsonl=str(tmp_path / "r.jsonl")), progress=lambda m: None)
+    # No empty pool in the table, so a resumed run redoes these scenarios.
+    assert pd.read_csv(tmp_path / "r.csv").empty
+
+
 def _plan_scenarios():
     out = []
     for i in range(40):

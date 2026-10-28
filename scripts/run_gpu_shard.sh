@@ -100,13 +100,19 @@ serve() {  # model, GPU memory share, extra vllm options
     .venv-vllm/bin/vllm serve "$1" --port 8000 --gpu-memory-utilization "$2" --max-model-len 8192 ${3:-} \
         > "$OUT/vllm_${1##*/}.log" 2>&1 &
     VLLM_PID=$!
+    VLLM_LOG="$OUT/vllm_${1##*/}.log"
     until curl -sf "$LIVE_API_BASE/models" > /dev/null; do
-        kill -0 "$VLLM_PID" 2> /dev/null || { echo "vLLM stopped, see $OUT/vllm_${1##*/}.log"; exit 1; }
+        kill -0 "$VLLM_PID" 2> /dev/null || { echo "vLLM stopped, see $VLLM_LOG"; exit 1; }
         sleep 5
     done
     log "serving $1"
 }
 trap '[ -n "${VLLM_PID:-}" ] && kill "$VLLM_PID" 2> /dev/null; [ -n "${BACKUP_PID:-}" ] && kill "$BACKUP_PID" 2> /dev/null' EXIT
+alive() {  # after each run: a server that died mid-run leaves failed calls behind
+    kill -0 "$VLLM_PID" 2> /dev/null && return 0
+    log "vLLM stopped during the last run, see $VLLM_LOG; fix it and relaunch (--resume redoes the failed calls)"
+    exit 1
+}
 stop() {
     kill "$VLLM_PID"
     wait "$VLLM_PID" 2> /dev/null || true
@@ -165,6 +171,7 @@ if ! done_step replays; then
         python scripts/run_replays.py --run-mode "$mode" --scenario-root "$PLAN/shard$SHARD/${mode}_r$n" \
             --num-replays "$n" --cosine-mapping raw $workers --max-inflight-calls 128 --resume \
             --output-csv "$OUT/replays_${mode}_r$n.csv" --output-jsonl "$OUT/replays_${mode}_r$n.jsonl"
+        alive
     done
     # Whitespace experiment: the same prompts as is and with extra spacing
     # that the canonical form removes, same seeds (see experiments/plan.py).
@@ -176,6 +183,7 @@ if ! done_step replays; then
             python scripts/run_replays.py --run-mode "$mode" --scenario-root "$root" --num-replays "$REPLAYS" \
                 --cosine-mapping raw --scenario-workers 16 --replay-workers 10 --max-inflight-calls 128 --resume \
                 --output-csv "$OUT/whitespace_${mode}_$variant.csv" --output-jsonl "$OUT/whitespace_${mode}_$variant.jsonl"
+            alive
         done
     done
     stop
@@ -208,6 +216,7 @@ if [ -n "$VICTIM2" ]; then
                 --cosine-mapping raw --scenario-workers 16 --replay-workers 10 --max-inflight-calls 128 --resume \
                 --output-csv "$OUT/replays_${mode}_r${VICTIM2_REPLAYS}_$vtag.csv" \
                 --output-jsonl "$OUT/replays_${mode}_r${VICTIM2_REPLAYS}_$vtag.jsonl"
+            alive
         done
         stop  # its weights stay on disk if it is also a judge
         case " $JUDGES " in *" $VICTIM2 "*) ;; *) forget "$VICTIM2" ;; esac
@@ -228,6 +237,7 @@ for judge in $JUDGES; do
         log "evaluator"
         python scripts/run_evaluator.py --input "${EVAL_FILES[@]}" --judge-model "$EVALUATOR" \
             --workers 64 --resume --output-csv "$OUT/evaluator.csv"
+        alive
         mark_done evaluator
     fi
     # Phi-4-reasoning writes its reasoning before the answer; 640 tokens cut
@@ -240,6 +250,7 @@ for judge in $JUDGES; do
         python scripts/run_investigator.py --replays "$OUT/replays_${mode}_r$n.jsonl" --judge "$judge" \
             --scenario-root "$ROOT" --max-tokens "$max_tokens" --workers 32 --resume \
             --output-csv "$OUT/investigator_${mode}_r${n}_$tag.csv"
+        alive
     done
     stop
     forget "$judge"
