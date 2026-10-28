@@ -80,6 +80,7 @@ on the Hub; only the aggregated tables go to this repository.
 |---|---|
 | `replays_<mode>_r<n>.jsonl` | every replay (text, seed, model, timing) |
 | `replays_<mode>_r<n>.csv` | Consistency and Fidelity per prompt |
+| `replays_<mode>_r<n>_pairs.jsonl` | raw cosine and BERTScore F1 of every pair of replays (threshold sensitivity, pairs with the same or different Evaluator verdicts) |
 | `replays_<mode>_r10_llama-3_1-8b-instruct.*` | the same for the second victim |
 | `evaluator.csv` | safe/unsafe verdict of every replay |
 | `investigator_<mode>_r<n>_<judge>.csv` | Investigator report per prompt and judge |

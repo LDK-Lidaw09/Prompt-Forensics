@@ -30,6 +30,10 @@ def test_replays_then_investigator(tmp_path, monkeypatch):
     lines = [json.loads(line) for line in open(jsonl_path)]
     first_pool = [line for line in lines if line["scenario_id"] == lines[0]["scenario_id"]]
     assert sorted(line["seed"] for line in first_pool) == [1234, 1235, 1236]
+    assert table["cons_min"].tolist() == [1.0, 1.0]
+    pairs = [json.loads(line) for line in open(tmp_path / "r_pairs.jsonl")]
+    assert len(pairs) == 2 and pairs[0]["indices"] == [0, 1, 2]
+    assert pairs[0]["cosine"] == [1.0, 1.0, 1.0] and pairs[0]["bert_f1"] == [1.0, 1.0, 1.0]
 
     answer = json.dumps({"decision": "attack", "maliciousness_score": 0.8, "adversarial_types": [],
                          "guardrail_violations": [], "risk_markers": [], "attack_succeeded": False,

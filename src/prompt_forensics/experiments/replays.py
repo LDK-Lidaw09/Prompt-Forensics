@@ -10,6 +10,12 @@ at most 512 new tokens. Two files are written:
 - a **CSV** file with one row per scenario: Consistency and Fidelity with
   embedding cosine and with BERTScore, their standard deviations and the
   number of pairs/replays above the similarity threshold.
+- a **pairs JSONL** file (``output_pairs``, by default the JSONL name with
+  ``_pairs``) with one line per scenario: the raw cosine and the BERTScore F1
+  of every pair of replays, in the order (0, 1), (0, 2), ..., (n-2, n-1) of
+  ``indices``. The pairs with replay 0 give Fidelity. Chapter 6 needs these
+  values for the analyses that compare pairs (same Evaluator verdict or not,
+  sensitivity to the threshold), which the CSV summaries cannot answer.
 
 A pool with failed replays is still written, with ``complete = False`` and the
 failed indices, so that the analysis can exclude it explicitly. With
@@ -41,14 +47,14 @@ CSV_FIELDS = [
     # Embedding cosine (see cosine_mapping)
     "cosine_mapping",
     "cons_score", "cons_std", "cons_raw_cosine_mean", "cons_threshold",
-    "cons_count_above", "cons_num_pairs",
+    "cons_count_above", "cons_num_pairs", "cons_min",
     "fid_score", "fid_std", "fid_raw_cosine_mean", "fid_threshold",
-    "fid_count_above", "fid_num_replays",
+    "fid_count_above", "fid_num_replays", "fid_min",
     # BERTScore F1
     "cons_bert_available", "cons_bert_score", "cons_bert_std", "cons_bert_threshold",
-    "cons_bert_count_above", "cons_bert_num_pairs",
+    "cons_bert_count_above", "cons_bert_num_pairs", "cons_bert_min",
     "fid_bert_available", "fid_bert_score", "fid_bert_std", "fid_bert_threshold",
-    "fid_bert_count_above", "fid_bert_num_replays",
+    "fid_bert_count_above", "fid_bert_num_replays", "fid_bert_min",
     "bert_error",
 ]
 
@@ -76,11 +82,13 @@ class ReplayConfig:
     resume: bool = False
     output_csv: str | None = None
     output_jsonl: str | None = None
+    output_pairs: str | None = None
 
     def resolved(self) -> "ReplayConfig":
         """Copy with every ``None`` default filled from the settings."""
         s = get_settings()
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        output_jsonl = self.output_jsonl or f"results/replay_outputs_{self.run_mode}_{stamp}.jsonl"
         return ReplayConfig(
             **{
                 **self.__dict__,
@@ -91,10 +99,31 @@ class ReplayConfig:
                 "scenario_root": self.scenario_root or s.scenario_root,
                 "output_csv": self.output_csv
                 or f"results/replay_robustness_{self.run_mode}_{stamp}.csv",
-                "output_jsonl": self.output_jsonl
-                or f"results/replay_outputs_{self.run_mode}_{stamp}.jsonl",
+                "output_jsonl": output_jsonl,
+                "output_pairs": self.output_pairs or _pairs_path(output_jsonl),
             }
         )
+
+
+def _pairs_path(output_jsonl: str) -> str:
+    root, ext = os.path.splitext(output_jsonl)
+    return f"{root}_pairs{ext or '.jsonl'}"
+
+
+def _pairs_row(scenario: dict, robust: dict, cfg: ReplayConfig) -> dict:
+    """Pair similarities of one pool, rounded to 4 decimals to keep the file small."""
+    cons, cons_b = robust["consistency"], robust["consistency_bert"]
+    pairs = cons.get("pairwise", [])
+    indices = sorted({d["i"] for d in pairs} | {d["j"] for d in pairs})
+    return {
+        "scenario_id": scenario_id(scenario),
+        "source_file": scenario.get("source_file", ""),
+        "run_mode": cfg.run_mode,
+        "target_model": cfg.target_model,
+        "indices": indices,
+        "cosine": [round(d["raw_cosine"], 4) for d in pairs],
+        "bert_f1": [round(d["f1"], 4) for d in cons_b.get("pairwise", [])],
+    }
 
 
 def _replay_key(sid: str, source: str, run_mode: str, model: str, idx: int, seed: int) -> tuple:
@@ -194,15 +223,19 @@ def _result_row(scenario: dict, robust: dict, cfg: ReplayConfig) -> dict[str, An
         "cons_score": cons["score"], "cons_std": cons["std"],
         "cons_raw_cosine_mean": cons["raw_cosine_mean"], "cons_threshold": cons["threshold"],
         "cons_count_above": cons["count_above"], "cons_num_pairs": cons["num_pairs"],
+        "cons_min": cons["min"],
         "fid_score": fid["score"], "fid_std": fid["std"],
         "fid_raw_cosine_mean": fid["raw_cosine_mean"], "fid_threshold": fid["threshold"],
         "fid_count_above": fid["count_above"], "fid_num_replays": fid["num_replays"],
+        "fid_min": fid["min"],
         "cons_bert_available": cons_b["available"], "cons_bert_score": cons_b["score"],
         "cons_bert_std": cons_b["std"], "cons_bert_threshold": cons_b["threshold"],
         "cons_bert_count_above": cons_b["count_above"], "cons_bert_num_pairs": cons_b["num_pairs"],
+        "cons_bert_min": cons_b["min"],
         "fid_bert_available": fid_b["available"], "fid_bert_score": fid_b["score"],
         "fid_bert_std": fid_b["std"], "fid_bert_threshold": fid_b["threshold"],
         "fid_bert_count_above": fid_b["count_above"], "fid_bert_num_replays": fid_b["num_replays"],
+        "fid_bert_min": fid_b["min"],
         "bert_error": cons_b["error"],
     }
 
@@ -225,7 +258,7 @@ def run_replays(cfg: ReplayConfig, progress: Callable[[str], None] = print) -> t
     # The embedding and BERTScore models are shared and not thread-safe.
     metrics_lock = threading.Lock()
 
-    with JsonlWriter(cfg.output_jsonl) as jsonl, \
+    with JsonlWriter(cfg.output_jsonl) as jsonl, JsonlWriter(cfg.output_pairs) as pair_file, \
             CsvWriter(cfg.output_csv, CSV_FIELDS, append=cfg.resume) as table:
 
         def process(scenario: dict) -> None:
@@ -241,6 +274,8 @@ def run_replays(cfg: ReplayConfig, progress: Callable[[str], None] = print) -> t
                     outputs, cfg.threshold, cfg.threshold,
                     cosine_mapping=cfg.cosine_mapping, use_bertscore=cfg.use_bertscore,
                 )
+            # Pairs first: a row in the CSV means the pool is fully written.
+            pair_file.write(_pairs_row(scenario, robust, cfg))
             table.write(_result_row(scenario, robust, cfg))
 
         with ThreadPoolExecutor(max_workers=max(1, cfg.scenario_workers)) as pool:

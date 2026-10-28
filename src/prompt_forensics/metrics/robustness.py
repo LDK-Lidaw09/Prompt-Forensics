@@ -11,7 +11,8 @@ N times (N = 10 in the thesis, seeds ``seed_base + i``).
 Each score is computed twice, once with embedding cosine and once with
 BERTScore F1. For each one the function also reports the population standard
 deviation and how many pairs (Consistency) or replays (Fidelity) reach the
-similarity threshold (0.90 in the thesis).
+similarity threshold (0.90 in the thesis). The smallest value is reported too,
+because a mean hides a single deviant replay.
 
 Cosine mapping
 --------------
@@ -56,14 +57,15 @@ def map_cosine(cosine: float, mapping: str) -> float:
 
 
 def _summary(values: list[float], threshold: float) -> dict[str, float | int | None]:
-    """Mean, population standard deviation and count at or above threshold."""
+    """Mean, population standard deviation, minimum and count at or above threshold."""
     if not values:
-        return {"score": None, "std": None, "count_above": 0}
+        return {"score": None, "std": None, "min": None, "count_above": 0}
     mean = sum(values) / len(values)
     variance = sum((v - mean) ** 2 for v in values) / len(values)
     return {
         "score": mean,
         "std": math.sqrt(variance),
+        "min": min(values),
         "count_above": sum(1 for v in values if v >= threshold),
     }
 

@@ -191,7 +191,8 @@ for pool in "${POOLS[@]}"; do
     EVAL_FILES+=("$OUT/replays_${mode}_r$n.jsonl")
 done
 for f in "$OUT"/whitespace_*.jsonl; do
-    if [ -f "$f" ]; then EVAL_FILES+=("$f"); fi
+    # *_pairs.jsonl hold pair similarities, not replays.
+    if [ -f "$f" ] && [[ "$f" != *_pairs.jsonl ]]; then EVAL_FILES+=("$f"); fi
 done
 
 # ---- 1b. Second victim on the deep-pool prompts -----------------------------------
