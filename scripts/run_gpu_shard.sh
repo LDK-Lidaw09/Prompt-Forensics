@@ -79,10 +79,16 @@ fi
 # only when the message matches exactly; recent tokenizers append the token,
 # so the error killed the whole server mid-run (shard 0, 2026-10-28). Match
 # the start of the message instead (the check later versions of vLLM use).
+# The recovery then rebuilds the stream with DecodeStream(skip_special_tokens)
+# passed by position, which recent tokenizers take as `ids` (TypeError, two
+# more crashes on shard 1): pass it by name.
 detok=$(echo .venv-vllm/lib/python3*/site-packages/vllm/v1/engine/detokenizer.py)
 if [ -f "$detok" ]; then
-    sed -i 's/if str(e) != INVALID_PREFIX_ERR_MSG:/if not str(e).startswith(INVALID_PREFIX_ERR_MSG):/' "$detok"
-    grep -q 'startswith(INVALID_PREFIX_ERR_MSG)' "$detok" || { echo "could not patch $detok"; exit 1; }
+    sed -i -e 's/if str(e) != INVALID_PREFIX_ERR_MSG:/if not str(e).startswith(INVALID_PREFIX_ERR_MSG):/' \
+        -e 's/DecodeStream(self.skip_special_tokens)/DecodeStream(skip_special_tokens=self.skip_special_tokens)/' "$detok"
+    if ! grep -q 'startswith(INVALID_PREFIX_ERR_MSG)' "$detok" || grep -q 'DecodeStream(self.skip_special_tokens)' "$detok"; then
+        echo "could not patch $detok"; exit 1
+    fi
 fi
 # shellcheck disable=SC1091
 . .venv/bin/activate
