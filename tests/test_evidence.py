@@ -77,3 +77,40 @@ def test_rewritten_record_fails_against_trusted_key(tmp_path):
     add(forged, "forged")
     assert forged.verify().ok
     assert not forged.verify(trusted.public_key_pem).ok
+
+
+def test_edited_raw_prompt_is_detected(store):
+    add(store, "one")
+    _tamper(store, "UPDATE interactions SET prompt_text = 'another question' WHERE id = 1")
+    assert any("prompt_text" in p for p in store.verify().problems)
+
+
+def test_edited_created_at_breaks_the_chain_hash(store):
+    add(store, "one")
+    _tamper(store, "UPDATE interactions SET created_at = '2020-01-01T00:00:00Z' WHERE id = 1")
+    assert any("chain_hash does not match" in p for p in store.verify().problems)
+
+
+def test_removed_last_records_need_an_anchor(store):
+    for text in ("one", "two", "three"):
+        add(store, text)
+    anchor = store.anchor()
+    _tamper(store, "DELETE FROM interactions WHERE id = 3")
+    assert store.verify().ok  # the chain alone cannot see a cut at the end
+    assert any("removed" in p for p in store.verify(anchors=[anchor]).problems)
+
+
+def test_history_rewritten_with_the_key_is_caught_by_an_anchor(tmp_path):
+    key = generate_key()
+    path = tmp_path / "s.sqlite"
+    store = EvidenceStore(path, key)
+    for text in ("one", "two"):
+        add(store, text)
+    anchor = store.anchor()
+    # The key holder rebuilds the whole database with a forged first answer.
+    path.unlink()
+    forged = EvidenceStore(path, key)
+    for text in ("forged", "two"):
+        add(forged, text)
+    assert forged.verify(key.public_key_pem).ok
+    assert not forged.verify(key.public_key_pem, anchors=[anchor]).ok
