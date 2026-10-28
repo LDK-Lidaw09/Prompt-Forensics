@@ -22,6 +22,11 @@ Each shard runs, on one GPU:
 1. the replays with `mistralai/Mistral-7B-Instruct-v0.3` (temperature 0.2,
    seed 1234 + i, 512 tokens), with Consistency and Fidelity from the raw
    cosine of `gte-large-en-v1.5` embeddings and from BERTScore;
+   With the victim still loaded, 500 deep-pool prompts (both shards
+   together) are replayed 10 more times as is and 10 times with extra
+   whitespace that the canonical form removes (double spaces, tabs, trailing
+   spaces, CRLF), same seeds: does dropping whitespace before hashing lose
+   anything that changes the answer? (`whitespace_*` files)
 2. the same deep-pool prompts replayed 10 times with a second victim,
    `meta-llama/Llama-3.1-8B-Instruct`, better aligned than Mistral-7B and the
    usual victim of jailbreak benchmarks, to check that the results do not

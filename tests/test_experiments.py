@@ -95,3 +95,29 @@ def test_write_plan_keeps_only_the_prompt_of_each_run_mode(tmp_path):
         assert loaded and all(s[other] is None for s in loaded)
         total += len(loaded)
     assert total == len(rows)
+
+
+def test_whitespace_perturbation_keeps_the_canonical_text():
+    import random
+
+    from prompt_forensics.canonical import normalize_text
+    from prompt_forensics.experiments.plan import perturb_whitespace
+
+    rng = random.Random(0)
+    for text in ["Summarise the memo in three bullets.", 'Quote "two  spaces" exactly.\nThanks', "x"]:
+        out = perturb_whitespace(text, rng)
+        assert out != text and normalize_text(out) == normalize_text(text)
+    assert '"two  spaces"' in perturb_whitespace('Quote "two  spaces" exactly.', rng)
+
+
+def test_whitespace_roots_pair_original_and_perturbed(tmp_path):
+    from prompt_forensics.experiments.plan import plan_runs, whitespace_sample, write_whitespace_roots
+    from prompt_forensics.scenarios import load_scenarios
+
+    scenarios = _plan_scenarios()
+    rows = plan_runs(scenarios, deep=8, shards=2)
+    sample = whitespace_sample(rows, 4)
+    roots = write_whitespace_roots(scenarios, sample, tmp_path)
+    orig = {s["id"]: s for r in roots if r.name.endswith("orig") for s in load_scenarios(r)}
+    pert = {s["id"]: s for r in roots if r.name.endswith("pert") for s in load_scenarios(r)}
+    assert orig.keys() == pert.keys() and len(orig) == 4

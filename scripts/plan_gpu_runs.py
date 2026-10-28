@@ -18,7 +18,12 @@ from pathlib import Path
 # Allow running from a fresh clone without "pip install -e .".
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from prompt_forensics.experiments.plan import plan_runs, write_plan  # noqa: E402
+from prompt_forensics.experiments.plan import (  # noqa: E402
+    plan_runs,
+    whitespace_sample,
+    write_plan,
+    write_whitespace_roots,
+)
 from prompt_forensics.scenarios import load_scenarios  # noqa: E402
 
 
@@ -30,6 +35,8 @@ def main() -> None:
     parser.add_argument("--deep-replays", type=int, default=100)
     parser.add_argument("--replays", type=int, default=10, help="replays of every other prompt")
     parser.add_argument("--shards", type=int, default=2, help="number of GPUs")
+    parser.add_argument("--whitespace", type=int, default=500,
+                        help="deep-pool prompts also replayed with extra whitespace (0: none)")
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--overwrite", action="store_true", help="replace existing scenario roots")
     args = parser.parse_args()
@@ -37,6 +44,9 @@ def main() -> None:
     scenarios = load_scenarios(args.scenario_root)
     rows = plan_runs(scenarios, args.deep, args.deep_replays, args.replays, args.shards, args.seed)
     roots = write_plan(scenarios, rows, args.out, overwrite=args.overwrite)
+    if args.whitespace:
+        sample = whitespace_sample(rows, args.whitespace, args.seed)
+        roots += write_whitespace_roots(scenarios, sample, args.out, args.seed, overwrite=args.overwrite)
     summary = {
         "prompts": len(rows),
         "by_pool_and_mode": {f"{p}/{m}": n for (p, m), n in sorted(Counter((r["pool"], r["run_mode"]) for r in rows).items())},

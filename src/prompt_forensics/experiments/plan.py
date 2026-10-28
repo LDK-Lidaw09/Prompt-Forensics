@@ -25,10 +25,12 @@ from __future__ import annotations
 
 import csv
 import random
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Sequence
 
+from ..canonical import normalize_text
 from ..datagen.assemble import write_scenarios
 from ..scenarios import RUN_MODES, main_prompt, scenario_id
 
@@ -115,6 +117,80 @@ def write_plan(scenarios: Sequence[dict[str, Any]], rows: Sequence[dict[str, Any
     roots = []
     for (shard, mode, n), items in sorted(groups.items()):
         root = out / f"shard{shard}" / f"{mode}_r{n}"
+        write_scenarios(items, root, overwrite=overwrite)
+        roots.append(root)
+    return roots
+
+
+# ---- Whitespace experiment -------------------------------------------------------
+#
+# The Prompt ID is computed after whitespace normalisation (canonical.py), so
+# two prompts that differ only in spacing share it. Is that safe, that is, does
+# the victim model answer them alike? A sample of deep-pool prompts is replayed
+# a second time as is, and once with whitespace that the normalisation removes
+# (double spaces, tabs, trailing spaces, CRLF line ends), with the same seeds.
+
+_QUOTED = re.compile(r'("[^"\n]*")')
+
+
+def perturb_whitespace(text: str, rng: random.Random) -> str:
+    """A copy of ``text`` with extra whitespace that ``normalize_text`` removes.
+
+    Quoted spans are left alone, since the normalisation keeps their spacing.
+    The result always differs from ``text`` and always normalises to the same
+    string.
+    """
+    parts = _QUOTED.split(text)
+    out = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # quoted span
+            out.append(part)
+            continue
+        lines = part.split("\n")
+        new_lines = []
+        for line in lines:
+            line = re.sub(r" ", lambda _: rng.choice([" ", " ", " ", "  ", "   ", "\t"]), line)
+            if line and rng.random() < 0.5:
+                line += rng.choice([" ", "  ", "\t"])
+            new_lines.append(line)
+        out.append("".join(
+            line + ("" if j == len(new_lines) - 1 else rng.choice(["\n", "\r\n"]))
+            for j, line in enumerate(new_lines)))
+    result = "".join(out)
+    if result == text:  # nothing was changed by chance: add a trailing space
+        result = text + " "
+    if normalize_text(result) != normalize_text(text):
+        raise AssertionError("whitespace perturbation changed the normalised text")
+    return result
+
+
+def whitespace_sample(rows: Sequence[dict[str, Any]], size: int = 500,
+                      seed: int = 2026) -> list[dict[str, Any]]:
+    """``size`` deep-pool rows drawn at random, each keeping its shard."""
+    deep = [r for r in rows if r["pool"] == "deep"]
+    return random.Random(seed).sample(deep, min(size, len(deep)))
+
+
+def write_whitespace_roots(scenarios: Sequence[dict[str, Any]], sample: Sequence[dict[str, Any]],
+                           out_dir: str | Path, seed: int = 2026,
+                           overwrite: bool = False) -> list[Path]:
+    """Scenario roots ``shard<k>/ws_<mode>_orig`` and ``ws_<mode>_pert``."""
+    rng = random.Random(seed)
+    by_id = {scenario_id(s): s for s in scenarios}
+    groups: dict[tuple[int, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in sample:
+        base = dict(by_id[row["scenario_id"]])
+        base.pop("source_file", None)
+        mode = row["run_mode"]
+        other = "safe" if mode == "attacks" else "attacks"
+        base[PROMPT_KEY[other]] = None
+        perturbed = dict(base)
+        perturbed[PROMPT_KEY[mode]] = perturb_whitespace(base[PROMPT_KEY[mode]], rng)
+        groups[(row["shard"], mode, "orig")].append(base)
+        groups[(row["shard"], mode, "pert")].append(perturbed)
+    roots = []
+    for (shard, mode, variant), items in sorted(groups.items()):
+        root = Path(out_dir) / f"shard{shard}" / f"ws_{mode}_{variant}"
         write_scenarios(items, root, overwrite=overwrite)
         roots.append(root)
     return roots

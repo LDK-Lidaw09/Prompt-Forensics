@@ -4,6 +4,8 @@
 # Per shard, in order:
 #   1. replays with the victim model (deep pools: 100 replays, shallow: 10),
 #      with Consistency / Fidelity (cosine + BERTScore);
+#   1a. 500 deep-pool prompts (both shards) replayed again as is and with
+#      extra whitespace, to test whether the canonical form may drop it;
 #   1b. replays of the deep-pool prompts with a second victim (Llama-3.1-8B,
 #      10 replays), to check that the results do not hold for one model only;
 #   2. Evaluator (Qwen3-14B) on every replay of both victims;
@@ -164,6 +166,18 @@ if ! done_step replays; then
             --num-replays "$n" --cosine-mapping raw $workers --max-inflight-calls 128 --resume \
             --output-csv "$OUT/replays_${mode}_r$n.csv" --output-jsonl "$OUT/replays_${mode}_r$n.jsonl"
     done
+    # Whitespace experiment: the same prompts as is and with extra spacing
+    # that the canonical form removes, same seeds (see experiments/plan.py).
+    for mode in attacks safe; do
+        for variant in orig pert; do
+            root="$PLAN/shard$SHARD/ws_${mode}_$variant"
+            [ -d "$root" ] || continue
+            log "whitespace $mode $variant"
+            python scripts/run_replays.py --run-mode "$mode" --scenario-root "$root" --num-replays "$REPLAYS" \
+                --cosine-mapping raw --scenario-workers 16 --replay-workers 10 --max-inflight-calls 128 --resume \
+                --output-csv "$OUT/whitespace_${mode}_$variant.csv" --output-jsonl "$OUT/whitespace_${mode}_$variant.jsonl"
+        done
+    done
     stop
     forget "$VICTIM"
     mark_done replays
@@ -175,6 +189,9 @@ for pool in "${POOLS[@]}"; do
     read -r mode n <<< "$pool"
     REPLAY_FILES+=("$OUT/replays_${mode}_r$n.jsonl")
     EVAL_FILES+=("$OUT/replays_${mode}_r$n.jsonl")
+done
+for f in "$OUT"/whitespace_*.jsonl; do
+    if [ -f "$f" ]; then EVAL_FILES+=("$f"); fi
 done
 
 # ---- 1b. Second victim on the deep-pool prompts -----------------------------------
