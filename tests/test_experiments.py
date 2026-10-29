@@ -68,6 +68,23 @@ def test_replays_stop_when_the_model_server_is_down(tmp_path, monkeypatch):
     assert pd.read_csv(tmp_path / "r.csv").empty
 
 
+def test_replays_stop_early_when_the_model_server_is_down(tmp_path, monkeypatch):
+    from prompt_forensics.experiments import replays
+    from prompt_forensics.llm import LLMError
+
+    def down(prompt, model, params):
+        raise LLMError("vllm: 500 Internal Server Error")
+
+    fake_metrics(monkeypatch)
+    monkeypatch.setattr(replays, "call_llm", down)
+    with pytest.raises(RuntimeError):
+        run_replays(ReplayConfig(
+            run_mode="attacks", limit=20, num_replays=3, scenario_workers=1, target_model="sim:victim",
+            output_csv=str(tmp_path / "r.csv"), output_jsonl=str(tmp_path / "r.jsonl")), progress=lambda m: None)
+    # The queued scenarios are cancelled instead of each failing in turn.
+    assert sum(1 for _ in open(tmp_path / "r.jsonl")) <= 2 * 3
+
+
 def _plan_scenarios():
     out = []
     for i in range(40):

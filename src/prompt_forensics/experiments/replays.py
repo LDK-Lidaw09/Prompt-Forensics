@@ -286,8 +286,16 @@ def run_replays(cfg: ReplayConfig, progress: Callable[[str], None] = print) -> t
 
         with ThreadPoolExecutor(max_workers=max(1, cfg.scenario_workers)) as pool:
             futures = [pool.submit(process, s) for s in todo]
-            for done, future in enumerate(as_completed(futures), start=1):
-                future.result()  # re-raise unexpected errors instead of hiding them
-                progress(f"{done}/{len(todo)} scenarios done")
+            try:
+                for done, future in enumerate(as_completed(futures), start=1):
+                    future.result()  # re-raise unexpected errors instead of hiding them
+                    progress(f"{done}/{len(todo)} scenarios done")
+            except BaseException:
+                # Without this, leaving the pool waits for every queued scenario:
+                # with the server down, each one fails at once and fills the
+                # JSONL with error rows (shard 0, 2026-10-29).
+                for future in futures:
+                    future.cancel()
+                raise
 
     return cfg.output_csv, cfg.output_jsonl
