@@ -75,13 +75,18 @@ def select_scenarios(
     run_mode: str,
     attack_filter: str | None = None,
     limit: int | None = None,
+    split: str | None = None,
 ) -> list[dict[str, Any]]:
     """Keep scenarios that have a prompt for ``run_mode``, then filter and cut.
 
     ``attack_filter`` matches ``attack_type`` after normalisation, either
     exactly or as a substring (``"injection"`` matches ``"prompt_injection"``).
+    ``split`` (``"dev"`` or ``"test"``) keeps one split of the version 2
+    dataset; version 1 scenarios have no split and are all dropped by it.
     """
     selected = [s for s in scenarios if main_prompt(s, run_mode)]
+    if split:
+        selected = [s for s in selected if s.get("split") == split]
     if attack_filter:
         wanted = normalize_attack_type(attack_filter)
         selected = [s for s in selected if wanted in normalize_attack_type(s.get("attack_type"))]

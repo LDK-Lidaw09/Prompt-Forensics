@@ -45,6 +45,7 @@ config ──► llm ──────────────► agents.* ─�
 | `pipeline` | Capture of a live interaction and replay of a stored one. |
 | `experiments.replays` / `evaluate` / `investigator` | Batch runners, resumable, writing CSV and JSONL. |
 | `experiments.analysis` | Tables 6.1–6.6 from the CSVs. |
+| `datagen.*` | Generation, deduplication and assembly of the version 2 safe prompts (see DATASET_V2.md). |
 
 ## Evidence model (thesis 4.2)
 
