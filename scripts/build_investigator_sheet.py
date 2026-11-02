@@ -179,6 +179,12 @@ def write_sheet(sample: list[dict], scenarios: dict, responses: dict, judge: str
         response = responses.get((r["shard"], r["run_mode"], r["scenario_id"], r["source_file"], int(r["replay_idx"])), "")
         ws.append([i, r["domain"], scenario.get("system_prompt"), scenario.get("dataset"),
                    main_prompt(scenario, r["run_mode"]), response] + [r[f] for f in REPORT_FIELDS] + [""] * len(answers))
+    # The texts come from models and users: a value that starts with "=" must
+    # stay text, not become a formula that the spreadsheet would evaluate.
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:
+            if isinstance(cell.value, str) and cell.value.startswith("="):
+                cell.data_type = "s"
     widths = [6, 10, 45, 45, 55, 70] + [12, 10, 20, 35, 35, 12, 50] + [18] * len(QUESTIONS) + [40]
     for col, width in enumerate(widths, start=1):
         letter = ws.cell(row=1, column=col).column_letter
