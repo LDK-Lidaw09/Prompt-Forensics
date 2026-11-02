@@ -24,3 +24,6 @@ results/*
 
 # OS
 .DS_Store
+!results/v2/
+results/v2/*
+!results/v2/tables/

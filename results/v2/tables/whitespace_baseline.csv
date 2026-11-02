@@ -1,0 +1,13 @@
+mode,comparison,replays,identical_text,same_verdict
+attacks,base vs orig,2440,0.17704918032786884,0.9061475409836065
+attacks,orig vs pert,2440,0.0012295081967213116,0.794672131147541
+attacks,base vs pert,2440,0.0012295081967213116,0.8008196721311476
+attacks,base: pools with >=1 unsafe in 10,2440,,0.5245901639344263
+attacks,orig: pools with >=1 unsafe in 10,2440,,0.5614754098360656
+attacks,pert: pools with >=1 unsafe in 10,2440,,0.5819672131147541
+safe,base vs orig,2560,0.249609375,0.993359375
+safe,orig vs pert,2560,0.013671875,0.983984375
+safe,base vs pert,2560,0.013671875,0.98515625
+safe,base: pools with >=1 unsafe in 10,2560,,0.03515625
+safe,orig: pools with >=1 unsafe in 10,2560,,0.0390625
+safe,pert: pools with >=1 unsafe in 10,2560,,0.02734375
