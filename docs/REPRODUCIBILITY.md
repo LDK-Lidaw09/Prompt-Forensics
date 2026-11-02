@@ -80,7 +80,8 @@ python scripts/analyze.py tail-risk --attacks results/evaluator_attacks.csv \
 - `--include-metadata` reproduces the thesis prompt, which shows the judge
   the scenario's attack family. Without it the judge is blind; the blind
   setting is the recommended one (see CHANGES.md).
-- The judge's JSON is constrained by vLLM guided decoding (`outlines`).
+- The judge's JSON is constrained by vLLM guided decoding (`xgrammar` for the
+  version 2 runs; see CHANGES.md).
 - Seed of the judge for replay *i*: `777 + i`.
 - A pool enters the tail-risk estimate only if its 10 replays were all
   classified; the number of excluded pools is reported.

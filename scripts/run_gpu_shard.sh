@@ -258,7 +258,7 @@ fi
 for judge in $JUDGES; do
     tag=$(basename "$judge" | tr 'A-Z.' 'a-z_')
     done_step "judge_$tag" && { [ "$judge" != "$EVALUATOR" ] || done_step evaluator; } && continue
-    serve "$judge" 0.9 "--guided-decoding-backend outlines"
+    serve "$judge" 0.9 "--guided-decoding-backend xgrammar"
     if [ "$judge" = "$EVALUATOR" ] && ! done_step evaluator; then
         log "evaluator"
         retry python scripts/run_evaluator.py --input "${EVAL_FILES[@]}" --judge-model "$EVALUATOR" \

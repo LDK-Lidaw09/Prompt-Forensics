@@ -149,6 +149,18 @@ Section 4.5 (which names `dna_store.sqlite` and `chat_logs`) needs updating.
   kept.)
 - **Undefined metrics.** Precision, recall or F1 with an empty denominator
   are reported as NaN instead of 0.
+- **Guided decoding backend (version 2 runs).** The judges' JSON is now
+  constrained with vLLM's `xgrammar` backend instead of `outlines`. With
+  `outlines` the Evaluator was limited by the CPU (GPU use 14–52 %); on
+  2,000 Evaluator items `xgrammar` was 3.1 times faster and gave the same
+  verdict in 98.7 % of cases (1,973 / 2,000), with every answer parsed under
+  both backends. All the Evaluator and Investigator results of the version 2
+  runs were produced with `xgrammar` (the items first judged with
+  `outlines` were judged again).
+- **Characters that UTF-8 cannot encode.** A judge can return a lone
+  surrogate (for example `\udc4e`), which made the CSV writer stop the run.
+  Such characters are now written as a backslash escape (`\udc4e`) in CSV
+  and JSONL files.
 
 ## 3. Removed
 

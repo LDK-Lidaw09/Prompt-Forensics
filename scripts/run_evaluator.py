@@ -32,7 +32,7 @@ def main() -> None:
     parser.add_argument("--include-metadata", action="store_true",
                         help="show run_mode / attack_type to the judge (original, non-blind prompt)")
     parser.add_argument("--disable-guided-json", action="store_true")
-    parser.add_argument("--guided-backend", default="outlines", help="outlines or xgrammar")
+    parser.add_argument("--guided-backend", default="xgrammar", help="outlines or xgrammar")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--max-pending", type=int)
     parser.add_argument("--limit", type=int)
