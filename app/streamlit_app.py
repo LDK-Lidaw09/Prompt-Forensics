@@ -10,6 +10,7 @@ Run it from the repository root::
 
 Tabs:
 
+- **Overview**     what PSI does and where each part lives in the interface.
 - **Capture**      send a prompt, store it as signed evidence, self-audit it.
 - **Red team**     toy adversary that rewrites a prompt into an attack.
 - **Replay**       replay a stored prompt, compare it with the original and
@@ -17,7 +18,9 @@ Tabs:
 - **Investigator** run the repository Investigator on chosen stored prompts.
 - **Experiments**  small runs of the dataset experiments and the tables of
                    chapter 6 from result CSVs.
-- **Evidence**     browse, export and verify the evidence store.
+- **Evidence**     browse, export and verify the evidence store, anchor its
+                   head, and tamper with a copy to see the checks at work.
+- **Results v2**   the result tables of the version 2 runs (thesis chapter 6).
 """
 
 from __future__ import annotations
@@ -25,7 +28,10 @@ from __future__ import annotations
 import difflib
 import io
 import json
+import shutil
+import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +40,9 @@ import streamlit as st
 
 # Make the package importable without installing it (``pip install -e .``
 # does the same thing permanently).
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))  # tamper_experiment.py: the tampering attacks
 
 from prompt_forensics.agents.adversary import ATTACK_TEMPLATES, run_attack  # noqa: E402
 from prompt_forensics.agents.comparators import judge_replay_safety, judge_replay_similarity  # noqa: E402
@@ -53,8 +61,25 @@ from prompt_forensics.pii import detect_sensitive, has_sensitive  # noqa: E402
 from prompt_forensics.pipeline import capture_interaction, get_store, replay_interaction  # noqa: E402
 from prompt_forensics.scenarios import RUN_MODES  # noqa: E402
 from prompt_forensics.signing import public_key_path  # noqa: E402
+from tamper_experiment import (  # noqa: E402
+    a_delete_middle, a_edit_response, a_edit_response_rechain, a_edit_response_rehash,
+    a_truncate_end, rows as read_rows, write_rows,
+)
 
 LANGUAGES = ["(none)", "English", "French", "Spanish", "German"]
+RESULTS_V2 = ROOT / "results" / "v2" / "tables"
+THESIS_VICTIM = "Mistral-7B"  # the victim reported in the thesis
+
+# Tampering attacks offered in the Evidence tab (from scripts/tamper_experiment.py).
+# The attacker edits the SQLite file directly but knows neither the private
+# signing key nor the anchor kept outside the database.
+TAMPERING = {
+    "Change the text of the response": a_edit_response,
+    "Change the response and recompute its SHA-256 hash": a_edit_response_rehash,
+    "Change the response and rebuild the hash chain (no key)": a_edit_response_rechain,
+    "Delete the record": a_delete_middle,
+    "Delete the last record (truncation)": a_truncate_end,
+}
 
 
 # --------------------------------------------------------------------- helpers
@@ -73,6 +98,23 @@ def fmt(value: Any, digits: int = 3) -> str:
     if isinstance(value, float):
         return f"{value:.{digits}f}"
     return str(value)
+
+
+def short_hash(value: str | None, n: int = 16) -> str:
+    return f"{value[:n]}…" if value else "–"
+
+
+def pct(value: Any, digits: int = 1) -> str:
+    try:
+        return f"{100 * float(value):.{digits}f} %"
+    except (TypeError, ValueError):
+        return "–"
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def served_models() -> list[str]:
+    """Models served by LM Studio; cached so that every rerun does not call it."""
+    return list_models("lmstudio")
 
 
 def download_csv(df: pd.DataFrame, filename: str, label: str = "Download CSV") -> None:
@@ -108,7 +150,7 @@ def sidebar() -> dict[str, Any]:
     """Model and generation settings shared by every tab."""
     settings = get_settings()
     st.sidebar.header("Model")
-    served = list_models("lmstudio")
+    served = served_models()
     source = st.sidebar.radio(
         "Model id", ["Configured (LIVE_MODEL)", "LM Studio list", "Manual"],
         help="Prefixes: vllm: (default), lmstudio:, openai:, anthropic:, sim: (offline echo).",
@@ -169,8 +211,9 @@ def tab_capture(opts: dict[str, Any]) -> None:
     result = st.session_state.get("capture_result")
     if not result:
         return
-    st.markdown("**Answer**")
-    st.write(result["response"])
+    with st.container(border=True):
+        st.markdown("**Answer of the model**")
+        st.write(result["response"])
 
     flags = detect_sensitive(result["response"])
     if has_sensitive(flags):
@@ -178,9 +221,18 @@ def tab_capture(opts: dict[str, Any]) -> None:
                    + ", ".join(k for k, v in flags.items() if v and k != "keywords")
                    + (f" · keywords: {', '.join(flags['keywords'])}" if flags["keywords"] else ""))
 
-    st.markdown("**Evidence**")
-    st.json({k: result[k] for k in ("prompt_id", "content_hash", "response_hash",
-                                    "chain_hash", "signed", "context_hash", "history_used")})
+    st.markdown("**Stored as evidence**")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Prompt ID", short_hash(result["prompt_id"]),
+              help="SHA-256 of the canonical form of the interaction (thesis 4.2).")
+    c2.metric("Chain hash", short_hash(result["chain_hash"]),
+              help="Links this record to the previous one: changing or removing any earlier "
+                   "record breaks the chain.")
+    c3.metric("ECDSA signature", "signed" if result["signed"] else "not signed",
+              help="The chain hash is signed with the private key of this installation.")
+    with st.expander("Full evidence record"):
+        st.json({k: result[k] for k in ("prompt_id", "content_hash", "response_hash",
+                                        "chain_hash", "signed", "context_hash", "history_used")})
     with st.expander("Provenance"):
         st.json(result["provenance"])
     if "audit" in result:
@@ -486,62 +538,242 @@ def tab_experiments(opts: dict[str, Any]) -> None:
 
 # ----------------------------------------------------------------- Evidence tab
 
+EVIDENCE_COLUMNS = ["id", "created_at", "record_type", "model_used", "prompt_text", "prompt_id", "chain_hash"]
+
+
+def show_report(report, what: str) -> None:
+    if report.ok:
+        st.success(f"{what}: all {report.checked} records verified, no problem found.")
+    else:
+        st.error(f"{what}: {len(report.problems)} problem(s) in {report.checked} records.")
+        for problem in report.problems:
+            st.markdown(f"- {problem}")
+
+
 def tab_evidence() -> None:
     settings = get_settings()
     store = get_store()
     st.subheader("Evidence store")
-    st.caption(f"`{settings.db_path}` · append-only (UPDATE and DELETE are refused by triggers).")
+    st.caption(f"`{settings.db_path}` · append-only: UPDATE and DELETE are refused by triggers. "
+               "Each record is chained to the previous one and its chain hash is signed (thesis 4.2).")
 
     counts = store.counts()
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     c1.metric("Interactions", counts["total"])
-    c2.write(counts["by_type"])
+    c2.metric("Live captures", counts["by_type"].get("live", 0))
+    c3.metric("Replays and attacks", counts["by_type"].get("replay", 0) + counts["by_type"].get("attack", 0))
 
     df = pd.DataFrame(store.recent_interactions(500))
-    st.dataframe(df, width="stretch")
-    if not df.empty:
+    if df.empty:
+        st.info("No stored interaction yet. Capture one in the Capture tab first.")
+    else:
+        shown = df[[c for c in EVIDENCE_COLUMNS if c in df.columns]]
+        st.dataframe(shown, width="stretch", hide_index=True)
         download_csv(df, "psi_evidence.csv")
-        pid = st.selectbox("Inspect a record", df["prompt_id"])
-        row = store.get_interaction(pid)
-        st.json({**row, "canonical_payload": json.loads(row["canonical_payload"]),
-                 "metadata_json": json.loads(row["metadata_json"])})
-        st.write("Annotations", store.annotations_for(row["id"]))
+        with st.expander("Inspect a record"):
+            pid = st.selectbox("Record", df["prompt_id"],
+                               format_func=lambda v: f"{v[:16]}… · "
+                               f"{df.loc[df['prompt_id'] == v, 'prompt_text'].iloc[0][:60]!r}")
+            row = store.get_interaction(pid)
+            st.json({**row, "canonical_payload": json.loads(row["canonical_payload"]),
+                     "metadata_json": json.loads(row["metadata_json"])})
+            st.write("Annotations", store.annotations_for(row["id"]))
 
-    st.markdown("**Verify integrity**")
-    st.caption("Recomputes every hash, walks the hash chain and checks every signature. "
-               "Upload the archived public key to check against a trusted key rather than the "
-               "key stored in each row.")
-    uploaded = st.file_uploader("Trusted public key (.pub.pem, optional)", key="pubkey")
-    if st.button("Verify"):
-        trusted = uploaded.getvalue().decode("ascii") if uploaded else None
-        report = store.verify(trusted)
-        if report.ok:
-            st.success(f"All {report.checked} records verified.")
-        else:
-            st.error(f"{len(report.problems)} problem(s) in {report.checked} records")
-            st.write(report.problems)
-    st.caption(f"Public key of this installation: `{public_key_path(settings.signing_key_path)}`")
+    st.markdown("#### Verify integrity")
+    st.caption("Recomputes every hash, walks the hash chain and checks every signature against a "
+               "trusted public key. Anchors (heads of the chain kept outside the database) also "
+               "reveal truncation and rewriting with a stolen key.")
+    local_key = Path(public_key_path(settings.signing_key_path))
+    col1, col2 = st.columns(2)
+    uploaded_key = col1.file_uploader("Trusted public key (.pub.pem)", key="pubkey",
+                                      help=f"Without one, the key of this installation is used: `{local_key}`.")
+    uploaded_anchors = col2.file_uploader("Anchors (.json, optional)", key="anchors",
+                                          accept_multiple_files=True)
+    b1, b2 = st.columns(2)
+    if b1.button("Verify the evidence store", type="primary"):
+        trusted = (uploaded_key.getvalue().decode("ascii") if uploaded_key
+                   else local_key.read_text() if local_key.exists() else None)
+        anchors = [json.loads(f.getvalue()) for f in uploaded_anchors or []]
+        show_report(store.verify(trusted, anchors=anchors), "Verification")
+    b2.download_button("Download an anchor of the current head",
+                       json.dumps(store.anchor(), indent=2).encode("utf-8"), "psi_anchor.json",
+                       "application/json",
+                       help="Keep this file outside the system (or have it time-stamped with "
+                            "scripts/anchor_evidence.py): it fixes the history up to now.")
+
+    st.markdown("#### Tampering demonstration")
+    st.caption("Tampers with a temporary copy of the store, as an attacker who can edit the SQLite "
+               "file but knows neither the private key nor the anchor would do, then verifies the "
+               "copy. The store itself is never modified.")
+    if df.empty:
+        st.info("Capture at least one interaction first.")
+        return
+    ids = df.sort_values("id")["id"].tolist()
+    attack_name = st.selectbox("Tampering", list(TAMPERING))
+    target = st.selectbox("Record to tamper with", ids,
+                          disabled=attack_name.startswith("Delete the last"))
+    if st.button("Tamper with a copy and verify it"):
+        trusted = local_key.read_text() if local_key.exists() else None
+        anchor = store.anchor()
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / "tampered.sqlite"
+            shutil.copy(settings.db_path, copy)
+            conn = sqlite3.connect(copy)
+            try:
+                conn.execute("DROP TRIGGER IF EXISTS interactions_no_update")
+                conn.execute("DROP TRIGGER IF EXISTS interactions_no_delete")
+                records = read_rows(conn)
+
+                class _OneRecord:  # the truncation removes exactly one record
+                    def randint(self, a, b):
+                        return 1
+
+                TAMPERING[attack_name](records, ids.index(target), _OneRecord(), None)
+                write_rows(conn, records)
+                conn.commit()
+            finally:
+                conn.close()
+            report = type(store)(copy).verify(trusted, anchors=[anchor])
+        show_report(report, "Tampered copy")
+
+
+# --------------------------------------------------------------- Overview tab
+
+def tab_overview() -> None:
+    st.markdown(
+        "PSI treats every prompt–response interaction with a large language model as a "
+        "forensic artefact. After an incident, it helps an examiner answer three questions.")
+    c1, c2, c3 = st.columns(3)
+    with c1.container(border=True):
+        st.markdown("##### 1. Record")
+        st.markdown("Has the logged interaction been changed since it was recorded?")
+        st.caption("Canonical form, SHA-256 Prompt ID, hash chain, ECDSA signature, external "
+                   "anchors (thesis 4.2). Tabs: **Capture**, **Evidence**.")
+    with c2.container(border=True):
+        st.markdown("##### 2. Replay")
+        st.markdown("How does the logged response compare with the responses obtained by "
+                    "replaying its prompt?")
+        st.caption("Replays under a documented sampling configuration, with one recorded seed per "
+                   "replay; Consistency and Fidelity (thesis 4.3, 5.2). Tab: **Replay**.")
+    with c3.container(border=True):
+        st.markdown("##### 3. Investigate")
+        st.markdown("Does the interaction show signs of an attempted attack?")
+        st.caption("Evaluator (harm of each replayed response) and Investigator (signs of an "
+                   "attempted attack), both LLM judges (thesis 4.4). Tabs: **Investigator**, "
+                   "**Experiments**.")
+    st.markdown("")
+    st.markdown("**Suggested tour.** Capture a prompt, look at its record in **Evidence**, verify "
+                "the store, then tamper with a copy and see which check detects the change. "
+                "**Results v2** shows the results of the full runs.")
+
+
+# ------------------------------------------------------------- Results v2 tab
+
+@st.cache_data(show_spinner=False)
+def load_table(name: str) -> pd.DataFrame | None:
+    path = RESULTS_V2 / f"{name}.csv"
+    return pd.read_csv(path) if path.exists() else None
+
+
+def tab_results() -> None:
+    st.subheader("Results of the version 2 runs")
+    st.caption(f"{THESIS_VICTIM}-Instruct-v0.3, temperature 0.2, 100 replays per prompt, on 21,600 "
+               "attack prompts and 19,981 legitimate prompts. Tables computed by "
+               "`scripts/analysis_v2/` from the raw runs; files in `results/v2/tables/`.")
+    tail = load_table("evaluator_tail_risk")
+    curve = load_table("tail_risk_curve")
+    summary = load_table("investigator_summary")
+    if tail is None or curve is None or summary is None:
+        st.info("The result tables are not in `results/v2/tables/`.")
+        return
+
+    tail = tail[(tail["victim"] == THESIS_VICTIM) & (tail["group"] == "all")].set_index("mode")
+    first = curve[curve["m"] == 1].set_index("mode")["tail"]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Attacks, unsafe with 1 replay", pct(first.get("attacks")))
+    c2.metric("Attacks, unsafe within 100 replays", pct(tail.loc["attacks", "tail_unsafe"]))
+    c3.metric("Legitimate, unsafe within 100", pct(tail.loc["safe", "tail_unsafe"]))
+    c4.metric("Unsafe replays (attacks)", pct(tail.loc["attacks", "rate_unsafe"]))
+    st.caption("A prompt counts as unsafe within m replays when the Evaluator judges at least one "
+               "of its first m replays suspicious or malicious. Human annotation of a sample shows "
+               "that the Evaluator misses many unsafe responses: these rates are lower bounds.")
+
+    st.markdown("#### Share of prompts with at least one unsafe replay, by number of replays")
+    chart = curve.pivot(index="m", columns="mode", values="tail").rename(
+        columns={"attacks": "attack prompts", "safe": "legitimate prompts"})
+    st.line_chart(chart, x_label="replays examined (m)", y_label="share of prompts",
+                  color=["#c0392b", "#1f4e79"])  # attack prompts in red, legitimate in blue
+
+    st.markdown("#### Investigator judges")
+    st.caption("Decision field of each judge; failed judgements are excluded and counted. "
+               "False positives are legitimate prompts flagged as attacks.")
+    inv = summary[summary["rule"] == "decision"]
+    view = pd.DataFrame({
+        "Judge": inv["judge"],
+        "Recall": inv["recall"].map(pct),
+        "False positives": inv["fpr"].map(lambda v: pct(v, 2)),
+        "Precision": inv["precision"].map(pct),
+        "F1": inv["f1"].map(pct),
+        "Failed (attacks / legitimate)": inv["failed_att"].astype(str) + " / " + inv["failed_safe"].astype(str),
+    })
+    st.dataframe(view, width="stretch", hide_index=True)
+
+    fp_kind = load_table("investigator_fp_by_kind")
+    recall_family = load_table("investigator_recall_by_family")
+    col1, col2 = st.columns(2)
+    if fp_kind is not None:
+        with col1:
+            st.markdown("**False positives by kind of legitimate prompt**")
+            kinds = fp_kind[(fp_kind["rule"] == "decision")
+                            & fp_kind["safe_kind"].isin(["standard", "hard_negative"])]
+            table = kinds.pivot(index="judge", columns="safe_kind", values="fpr").rename(
+                columns={"standard": "standard", "hard_negative": "resembling attacks"})
+            st.dataframe(table.map(lambda v: pct(v, 2)), width="stretch")
+    if recall_family is not None:
+        with col2:
+            st.markdown("**Recall by attack family**")
+            fam = recall_family[recall_family["rule"] == "decision"]
+            table = fam.pivot(index="family", columns="judge", values="recall")
+            st.dataframe(table.map(pct), width="stretch")
+
+    with st.expander("All tables"):
+        for path in sorted(RESULTS_V2.glob("*.csv")):
+            df = pd.read_csv(path)
+            if "victim" in df.columns:
+                df = df[df["victim"] == THESIS_VICTIM]
+            st.markdown(f"`{path.name}`")
+            st.dataframe(df, width="stretch", hide_index=True)
 
 
 # ------------------------------------------------------------------------ main
 
 def main() -> None:
-    st.set_page_config(page_title="PSI – Prompt Forensics", layout="wide")
-    st.title("PSI – Prompt Forensics")
+    st.set_page_config(page_title="PSI · Prompt Forensics", page_icon="🔎", layout="wide")
+    st.title("PSI · Prompt Scene Investigation")
+    st.caption("Record, replay and investigate interactions with large language models.")
     opts = sidebar()
-    tabs = st.tabs(["Capture", "Red team", "Replay", "Investigator", "Experiments", "Evidence"])
+    if opts["model"].startswith("sim:"):
+        st.warning("Simulator mode: the model only echoes the prompt. Hashes, chain, signatures and "
+                   "verification are real. For real answers, start LM Studio and choose "
+                   "“LM Studio list” in the sidebar, or set LIVE_MODEL.")
+    tabs = st.tabs(["Overview", "Capture", "Red team", "Replay", "Investigator", "Experiments",
+                    "Evidence", "Results v2"])
     with tabs[0]:
-        tab_capture(opts)
+        tab_overview()
     with tabs[1]:
-        tab_red_team(opts)
+        tab_capture(opts)
     with tabs[2]:
-        tab_replay(opts)
+        tab_red_team(opts)
     with tabs[3]:
-        tab_investigator(opts)
+        tab_replay(opts)
     with tabs[4]:
-        tab_experiments(opts)
+        tab_investigator(opts)
     with tabs[5]:
+        tab_experiments(opts)
+    with tabs[6]:
         tab_evidence()
+    with tabs[7]:
+        tab_results()
 
 
 main()
