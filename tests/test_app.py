@@ -1,5 +1,6 @@
 """Smoke test of the Streamlit interface (renders every tab, no model server)."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -14,10 +15,20 @@ def button(app, label):
     return next(b for b in app.button if b.label == label)
 
 
+def tab_labels(app):
+    """Tab labels without their Material icon prefix (":material/name: Label")."""
+    return {re.sub(r"^:material/\w+:\s*", "", t.label) for t in app.tabs}
+
+
+def html_text(app):
+    """Text of the HTML components (cards, banners) of the page."""
+    return " ".join(h.proto.body for h in app.get("html"))
+
+
 def test_app_renders_and_captures(no_ml):
     app = AppTest.from_file(str(APP), default_timeout=60).run()
     assert not app.exception
-    labels = {t.label for t in app.tabs}
+    labels = tab_labels(app)
     assert {"Capture", "Red team", "Replay", "Investigator", "Experiments", "Evidence",
             "Replay explorer", "Results v2"} <= labels
     app.text_area[0].input("Hello PSI")
@@ -46,8 +57,8 @@ def test_app_tampering_demo_detects_change(no_ml):
 def test_app_results_tab_renders(no_ml):
     app = AppTest.from_file(str(APP), default_timeout=60).run()
     assert not app.exception
-    assert "Results v2" in {t.label for t in app.tabs}
-    assert any("within 100 replays" in m.label for m in app.metric)
+    assert "Results v2" in tab_labels(app)
+    assert "unsafe within 100" in html_text(app)
 
 
 def test_app_loads_real_examples(no_ml):
@@ -59,4 +70,4 @@ def test_app_loads_real_examples(no_ml):
     assert any("10 already present" in s.value for s in app.success)
     button(app, "Verify the evidence store").click().run()
     assert any("no problem found" in s.value for s in app.success)
-    assert any(m.label == "Malicious" for m in app.metric)  # replay explorer rendered
+    assert "First unsafe replay" in html_text(app)  # replay explorer rendered

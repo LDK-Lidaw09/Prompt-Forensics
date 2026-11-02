@@ -32,7 +32,7 @@ ml = [
     "torch>=2.1",
 ]
 # Demo interface (thesis 4.5).
-ui = ["streamlit>=1.46"]
+ui = ["streamlit>=1.50"]
 dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
