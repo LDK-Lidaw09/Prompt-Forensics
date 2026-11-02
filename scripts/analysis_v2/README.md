@@ -30,3 +30,12 @@ Cleaning rules:
   rate counts malicious only);
 - Investigator: one row per prompt and judge, failed calls excluded and counted;
 - safe prompts are split into `standard` and `hard_negative` with `plan/plan.csv`.
+
+## Second judge
+
+`sample_second_judge.py` draws 20,203 replays (10,000 attack and 10,000 safe,
+stratified by family × domain × safe-prompt kind, plus the 193 replays of the
+human validation sheet) into `data/second_judge/sample_20k.jsonl.gz`.
+`scripts/run_second_judge.sh` judges them on one GPU with a second Evaluator
+(default `google/gemma-3-27b-it`, same blind prompt and settings), and
+`second_judge.py` measures its agreement with Qwen3-14B and with the human labels.
