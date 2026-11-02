@@ -1,0 +1,15 @@
+# Theme of the demo interface (app/streamlit_app.py). Streamlit reads this
+# file when the app is started from the repository root.
+[theme]
+base = "light"
+primaryColor = "#1f4e79"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f6f9"
+textColor = "#1b1f24"
+font = "sans serif"
+
+[server]
+headless = false
+
+[browser]
+gatherUsageStats = false
