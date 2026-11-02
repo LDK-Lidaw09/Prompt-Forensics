@@ -1,17 +1,26 @@
-# Environnements virtuels
-.venv/
-venv/
-*/.venv/
-
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
 
-# Logs & temporaires
-*.log
-.DS_Store
+# Virtual environments
+.venv/
+venv/
 
-# Autres dossiers à ignorer éventuellement
+# Local configuration and secrets
 .env
+keys/
+
+# Evidence store (contains prompts and answers)
+*.sqlite
+*.sqlite-journal
+
+# Outputs of new runs (published results live in results/pilot_2025-12/)
+results/*
+!results/pilot_2025-12/
+
+# OS
+.DS_Store

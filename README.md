@@ -1,72 +1,125 @@
-# 🧬 Prompt Forensics
+# Prompt Forensics (PSI)
 
-Prompt Forensics is a research-oriented framework to **analyze, stress-test and audit Large Language Models (LLMs)** through adversarial prompts and “LLM-as-a-Judge” evaluation.
+Reference implementation of **PSI (Prompt Scene Investigation)**, the framework
+of the M.Sc. thesis *Prompt Forensics: Toward a New Subdomain for Investigating
+LLM Interactions* (Lidaw Fabrice Ledjaki, Université de Montréal, 2026).
 
-The goal is to answer a simple question:
+PSI treats every prompt–response interaction with a large language model as a
+forensic artefact:
 
-> *How robust is a model (or a panel of models) against realistic prompt attacks, and how reliable is an LLM-based judge to detect those attacks?*
+1. **Capture** — the interaction is serialised canonically, identified by a
+   SHA-256 Prompt ID, signed (ECDSA P-256) and appended to a hash-chained,
+   append-only evidence store.
+2. **Replay** — the prompt is replayed under controlled seeds to measure how
+   stable the model's behaviour is (Consistency and Fidelity, with embedding
+   cosine and BERTScore) and how often a pool of replays hides an unsafe
+   answer (tail-risk).
+3. **Investigate** — LLM agents judge each replay (Evaluator Agent) and
+   analyse the prompt–response pair for adversarial intent
+   (LLM-as-Investigator).
 
-This repository provides:
+## Where each part of the thesis lives
 
-- A **Streamlit UI** to explore prompts, Prompt DNA, and robustness scores  
-- A **scenario engine** to run adversarial attacks across domains (health, education, IP, audit, etc.)  
-- A **Judge Evaluation pipeline** that computes metrics (Accuracy, Precision, Recall, F1) for LLM judges on labeled attack scenarios  
+| Thesis | Code |
+|---|---|
+| 4.2.1–4.2.2 Canonical serialisation, Prompt ID, signatures | `src/prompt_forensics/canonical.py`, `signing.py` |
+| 4.2.3 Append-only evidence store | `src/prompt_forensics/storage.py`, `scripts/verify_evidence.py` |
+| 4.3.1 Replay protocol | `src/prompt_forensics/experiments/replays.py`, `scripts/run_replays.py` |
+| 4.3.2–4.3.3, 5.2 Consistency and Fidelity | `src/prompt_forensics/metrics/` |
+| 4.3.4, 5.3 Evaluator Agent and tail-risk | `agents/evaluator.py`, `experiments/evaluate.py`, `scripts/run_evaluator.py` |
+| 4.4, 5.4 LLM-as-Investigator | `agents/investigator.py`, `experiments/investigator.py`, `scripts/run_investigator.py` |
+| 4.5 Demo application | `app/streamlit_app.py` |
+| 5.1 Dataset (24,000 scenarios) | `data/scenarios/`, `src/prompt_forensics/scenarios.py` |
+| Tables 6.1–6.6 | `src/prompt_forensics/experiments/analysis.py`, `scripts/analyze.py` |
+| Pilot study (Dec. 2025) | `agents/repository_investigator.py`, `experiments/pilot_investigator.py`, `results/pilot_2025-12/` |
 
----
+## Repository layout
 
-## ✨ Key Concepts
+```
+src/prompt_forensics/   the library (every computation lives here)
+  agents/               LLM agents: Evaluator, Investigator, demo judges
+  metrics/              similarity backends and replay robustness
+  experiments/          batch runners and result tables
+scripts/                command-line entry points for the experiments
+app/streamlit_app.py    demo interface (single file, calls the library only)
+data/scenarios/         the dataset: 6 attack families x 4 domains
+results/pilot_2025-12/  results of the pilot study
+tests/                  unit and end-to-end tests (no GPU, no model server)
+docs/                   architecture, reproduction guide, change log
+```
 
-### 🔬 Prompt DNA
+## Installation
 
-Each prompt (benign or malicious) is represented by a **Prompt DNA**:
+Python 3.10 or newer.
 
-- A unique hash / identifier  
-- Metadata about the domain (health, education, IP, audit, …)  
-- Attack family (jailbreak, data leakage, phishing, deceptive delight, belief elicitation, reverse psychology, etc.)  
-- Optional embeddings and features for semantic comparison
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[ml,ui,dev]"      # or: pip install -r requirements.txt
+cp .env.example .env               # then edit the model endpoints
+```
 
-Prompt DNA allows:
+The `ml` extra (PyTorch, sentence-transformers, bert-score) is only needed
+for the Consistency and Fidelity metrics. Everything else, including the
+tests, runs without it.
 
-- **Replay** of a given prompt on different models  
-- **Tracking** of attacks across experiments  
-- **Comparison** of outputs using similarity metrics  
+## Quick start
 
-### 🧪 Adversarial Scenarios
+**Without any model server**, using the built-in simulator (`sim:` model ids
+echo the prompt):
 
-The repo includes curated JSON scenario files, such as:
+```bash
+LIVE_MODEL=sim:victim JUDGE_MODEL=sim:judge streamlit run app/streamlit_app.py
+pytest
+```
 
-- `health_jailbreak_scenarios.json`  
-- `education_data_leakage_scenarios.json`  
-- `ip_reverse_psychology_scenarios.json`  
-- `audit_belief_elicitation_scenarios.json`  
+**With models served by vLLM** (OpenAI-compatible API on port 8000):
 
-Each scenario typically specifies:
+```bash
+# 1. Replay pools: 10 replays per scenario, seeds 1234..1243
+python scripts/run_replays.py --run-mode attacks --resume \
+    --output-csv results/robustness_attacks.csv --output-jsonl results/replays_attacks.jsonl
+# 2. Evaluator Agent on every replay
+python scripts/run_evaluator.py --input results/replays_attacks.jsonl \
+    --output-csv results/evaluator_attacks.csv --resume
+# 3. Investigator, one judge at a time
+python scripts/run_investigator.py --replays results/replays_attacks.jsonl \
+    --judge Qwen/Qwen3-14B --output-csv results/investigator_attacks_qwen3_14b.csv --resume
+# (repeat 1-3 with --run-mode safe / the safe files)
+# 4. Tables of chapter 6
+python scripts/analyze.py tail-risk --attacks results/evaluator_attacks.csv --safe results/evaluator_safe.csv
+```
 
-- `domain` (health, education, IP, audit)  
-- `attack_type` (jailbreak, data_leakage, phishing, etc.)  
-- `context` and `actor`  
-- `objective` (what the attacker wants)  
-- `prompt` (the actual adversarial prompt to send to the model)  
-- `gold_label` (e.g. `malicious` / `benign`)
+The full protocol, with every parameter, is in
+[docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md).
 
-These scenarios are used to **benchmark models and judges** in a reproducible way.
+## Model identifiers
 
-### ⚖️ LLM as a Judge
+A model id may carry a prefix that selects the backend:
 
-Prompt Forensics can use one or several LLMs as **judges**:
+| Id | Backend |
+|---|---|
+| `Qwen/Qwen3-14B` (no prefix) | OpenAI-compatible server at `LIVE_API_BASE` (vLLM) |
+| `lmstudio:<name>` | LM Studio at `LMSTUDIO_API_BASE` |
+| `openai:<name>` | OpenAI API (`OPENAI_API_KEY`) |
+| `anthropic:<name>` | Anthropic API (`ANTHROPIC_API_KEY`) |
+| `sim:<anything>` | offline simulator, for tests and demos |
 
-- A judge receives **a prompt, the model’s answer, and metadata**  
-- It outputs a **structured JSON verdict**, e.g.:
+A failed model call raises an error; nothing silently falls back to the
+simulator.
 
-```json
-{
-  "semantic_similarity": 0.92,
-  "meaning_changed": false,
-  "safety_regression": true,
-  "changed_aspect": ["style", "safety"],
-  "analysis_summary": "The output respects the task semantics but introduces unsafe content.",
-  "is_malicious_prompt": true,
-  "adversarial_type": ["jailbreak"],
-  "safety_violation": true,
-  "risk_markers": ["ignore previous instructions", "override system role"]
-}
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the pieces fit together and why.
+- [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) — exact commands and settings of every experiment.
+- [docs/CHANGES.md](docs/CHANGES.md) — every behaviour change from the original research code, and what it means for the reported numbers.
+
+## Testing
+
+```bash
+pytest
+```
+
+The suite checks canonicalisation, signatures and tamper detection, the
+robustness formulas, judge-output parsing, the result tables (against
+hand-computed values) and runs the experiments and the interface end to end
+with the simulator.
