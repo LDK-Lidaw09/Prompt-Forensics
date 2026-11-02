@@ -1,0 +1,6 @@
+{
+  "records": 1000,
+  "trials": 100,
+  "seed": 2026,
+  "out": "/tmp/claude-0/-home-user-prompt-forensics/de608795-7693-5721-be9b-dc3675d0e807/scratchpad/tamper"
+}

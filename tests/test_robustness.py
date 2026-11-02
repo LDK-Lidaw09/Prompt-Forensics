@@ -41,6 +41,7 @@ def test_pairs_and_population_std():
     assert result["consistency"]["score"] == pytest.approx(2 / 3)
     assert result["consistency"]["std"] == pytest.approx(0.2357, abs=1e-4)
     assert result["consistency"]["count_above"] == 1
+    assert result["consistency"]["min"] == pytest.approx(0.5)
 
 
 def test_missing_replays_are_reported_not_scored_as_zero():

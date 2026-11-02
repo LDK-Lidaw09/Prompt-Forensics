@@ -54,7 +54,7 @@ Python 3.10 or newer.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[ml,ui,dev]"      # or: pip install -r requirements.txt
+pip install -e ".[ml,ui,datagen,dev]"   # or: pip install -r requirements.txt
 cp .env.example .env               # then edit the model endpoints
 ```
 
@@ -112,6 +112,7 @@ simulator.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the pieces fit together and why.
 - [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) — exact commands and settings of every experiment.
 - [docs/CHANGES.md](docs/CHANGES.md) — every behaviour change from the original research code, and what it means for the reported numbers.
+- [docs/DATASET_V2.md](docs/DATASET_V2.md) — why and how the safe prompts are regenerated (dataset version 2).
 
 ## Testing
 

@@ -19,7 +19,10 @@ def _cell(value: Any) -> Any:
     if value is None:
         return ""
     if isinstance(value, (list, dict)):
-        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+        value = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    if isinstance(value, str):
+        # A model can return a lone surrogate, which UTF-8 cannot encode.
+        value = value.encode("utf-8", "backslashreplace").decode("utf-8")
     return value
 
 
@@ -33,6 +36,7 @@ class JsonlWriter:
 
     def write(self, obj: dict[str, Any]) -> None:
         line = json.dumps(obj, ensure_ascii=False)
+        line = line.encode("utf-8", "backslashreplace").decode("utf-8")
         with self._lock:
             self._file.write(line + "\n")
             self._file.flush()

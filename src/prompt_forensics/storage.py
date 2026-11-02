@@ -10,13 +10,20 @@ Integrity guarantees, from weakest to strongest:
    row in ``annotations``; the original interaction is never rewritten.
 2. **Self-describing hashes.** Each interaction keeps its canonical payload,
    so its Prompt ID, content hash and response hash can be recomputed.
-3. **Hash chain.** Each row's ``chain_hash`` covers the previous row's
-   ``chain_hash``. Deleting or reordering rows breaks the chain.
+3. **Hash chain.** Each row's ``chain_hash`` covers every stored field of
+   the row (through their hashes) and the previous row's ``chain_hash``.
+   Editing, deleting or reordering rows breaks the chain.
 4. **Signatures.** Each ``chain_hash`` is signed with an ECDSA key kept outside
    the database (see :mod:`prompt_forensics.signing`). Someone who edits the
    file directly (bypassing the triggers) cannot produce valid signatures.
+5. **Anchors.** The chain alone cannot show that the *last* rows were
+   removed, and whoever holds the signing key can rebuild and re-sign the
+   whole chain. :meth:`EvidenceStore.anchor` returns the head of the chain
+   (row count and last ``chain_hash``); kept outside the system, for example
+   with an RFC 3161 timestamp (``scripts/anchor_evidence.py``), it fixes the
+   history up to that point.
 
-:meth:`EvidenceStore.verify` checks all four properties and reports every
+:meth:`EvidenceStore.verify` checks these properties and reports every
 problem it finds.
 """
 
@@ -30,7 +37,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
-from .canonical import canonical_json, content_hash, prompt_id, sha256_hex, text_hash
+from .canonical import canonical_json, content_hash, normalize_text, prompt_id, sha256_hex, text_hash
 from .signing import SigningKey, verify_signature
 
 GENESIS_HASH = "0" * 64
@@ -100,26 +107,27 @@ def _append_only_triggers() -> str:
     return "\n".join(statements)
 
 
-def chain_digest(
-    *,
-    prev_chain_hash: str,
-    prompt_id_value: str,
-    response_hash: str,
-    record_type: str,
-    metadata_json: str,
-) -> str:
-    """Digest that links one interaction to the previous one."""
-    return sha256_hex(
-        canonical_json(
-            {
-                "prev_chain_hash": prev_chain_hash,
-                "prompt_id": prompt_id_value,
-                "response_hash": response_hash,
-                "record_type": record_type,
-                "metadata_sha256": sha256_hex(metadata_json),
-            }
-        )
-    )
+# Columns of ``interactions`` covered by ``chain_hash`` as they are; the long
+# texts are covered through their SHA-256 (see ``chain_digest``).
+CHAINED_FIELDS = (
+    "prompt_id", "content_hash", "created_at", "record_type", "user_id", "session_id",
+    "model_requested", "model_used", "provider", "response_hash", "prev_chain_hash",
+)
+
+
+def chain_digest(row: Mapping[str, Any]) -> str:
+    """Digest that covers every stored field of a row and links it to the previous one.
+
+    Only ``id`` (assigned by SQLite), ``chain_hash`` itself, ``signature`` and
+    ``public_key_pem`` are left out. ``canonical_payload`` is covered by
+    ``prompt_id``, ``response_text`` by ``response_hash``; ``prompt_text``
+    (the prompt exactly as received, before normalisation) and
+    ``metadata_json`` enter through their own SHA-256.
+    """
+    record = {name: row[name] for name in CHAINED_FIELDS}
+    record["prompt_text_sha256"] = sha256_hex(row["prompt_text"])
+    record["metadata_sha256"] = sha256_hex(row["metadata_json"])
+    return sha256_hex(canonical_json(record))
 
 
 @dataclass
@@ -197,13 +205,15 @@ class EvidenceStore:
                 "SELECT chain_hash FROM interactions ORDER BY id DESC LIMIT 1"
             ).fetchone()
             prev = row["chain_hash"] if row else GENESIS_HASH
-            digest = chain_digest(
-                prev_chain_hash=prev,
-                prompt_id_value=pid,
-                response_hash=rhash,
-                record_type=record_type,
-                metadata_json=metadata_json,
-            )
+            record = {
+                "prompt_id": pid, "content_hash": chash, "created_at": utc_now(),
+                "record_type": record_type, "user_id": payload.get("user_id"),
+                "session_id": payload.get("session_id"), "model_requested": str(payload.get("model", "")),
+                "model_used": model_used, "provider": provider,
+                "prompt_text": str(payload.get("prompt", "")), "response_hash": rhash,
+                "metadata_json": metadata_json, "prev_chain_hash": prev,
+            }
+            digest = chain_digest(record)
             signature = self.signing_key.sign_digest(digest) if self.signing_key else None
             public_key = self.signing_key.public_key_pem if self.signing_key else None
             cursor = conn.execute(
@@ -218,14 +228,14 @@ class EvidenceStore:
                 (
                     pid,
                     chash,
-                    utc_now(),
+                    record["created_at"],
                     record_type,
-                    payload.get("user_id"),
-                    payload.get("session_id"),
-                    str(payload.get("model", "")),
+                    record["user_id"],
+                    record["session_id"],
+                    record["model_requested"],
                     model_used,
                     provider,
-                    str(payload.get("prompt", "")),
+                    record["prompt_text"],
                     response_text,
                     rhash,
                     canonical,
@@ -320,12 +330,25 @@ class EvidenceStore:
 
     # ----------------------------------------------------------------- verify
 
-    def verify(self, trusted_public_key_pem: str | None = None) -> VerificationReport:
+    def anchor(self) -> dict[str, Any]:
+        """Head of the chain: keep it outside the system to fix the history so far."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT chain_hash FROM interactions ORDER BY id").fetchall()
+        return {
+            "records": len(rows),
+            "chain_hash": rows[-1]["chain_hash"] if rows else GENESIS_HASH,
+            "created_at": utc_now(),
+        }
+
+    def verify(self, trusted_public_key_pem: str | None = None,
+               anchors: list[Mapping[str, Any]] | None = None) -> VerificationReport:
         """Recompute every hash, walk the chain and check every signature.
 
         If ``trusted_public_key_pem`` is given, signatures must verify against
         that key; otherwise the key stored in each row is used, which only
-        proves internal consistency.
+        proves internal consistency. Each anchor (from :meth:`anchor`, kept
+        outside the database) must still be in the chain: the record at its
+        position must exist and carry the anchored ``chain_hash``.
         """
         report = VerificationReport()
         expected_prev = GENESIS_HASH
@@ -345,17 +368,12 @@ class EvidenceStore:
                 report.problems.append(f"{rid}: content_hash does not match the payload")
             if text_hash(row["response_text"]) != row["response_hash"]:
                 report.problems.append(f"{rid}: response_hash does not match the response")
+            if normalize_text(row["prompt_text"]) != payload.get("prompt", ""):
+                report.problems.append(f"{rid}: prompt_text does not match the payload")
             if row["prev_chain_hash"] != expected_prev:
                 report.problems.append(f"{rid}: chain broken (a row was removed or reordered)")
 
-            digest = chain_digest(
-                prev_chain_hash=row["prev_chain_hash"],
-                prompt_id_value=row["prompt_id"],
-                response_hash=row["response_hash"],
-                record_type=row["record_type"],
-                metadata_json=row["metadata_json"],
-            )
-            if digest != row["chain_hash"]:
+            if chain_digest(row) != row["chain_hash"]:
                 report.problems.append(f"{rid}: chain_hash does not match its content")
 
             key = trusted_public_key_pem or row["public_key_pem"]
@@ -365,4 +383,17 @@ class EvidenceStore:
                 report.problems.append(f"{rid}: invalid signature")
 
             expected_prev = row["chain_hash"]
+
+        heads = [row["chain_hash"] for row in rows]
+        for anchor in anchors or []:
+            n, when = int(anchor["records"]), anchor.get("created_at", "?")
+            if n == 0:
+                continue
+            if n > len(heads):
+                report.problems.append(
+                    f"anchor of {when}: {n} records anchored, {len(heads)} left (records were removed)")
+            elif heads[n - 1] != anchor["chain_hash"]:
+                report.problems.append(
+                    f"anchor of {when}: record {n} no longer has the anchored chain hash "
+                    "(the history was rewritten)")
         return report

@@ -17,9 +17,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Generation of the version 2 safe prompts (Anthropic API).
+datagen = [
+    "anthropic>=1.0",
+    "numpy>=1.26",
+]
 # Embedding cosine and BERTScore (Consistency / Fidelity, thesis 5.2).
 ml = [
-    "sentence-transformers>=3.0",
+    "sentence-transformers>=3.0,<6",
+    # gte-large-en-v1.5 ships modelling code that breaks under transformers 5
+    # (uninitialised rotary buffers, removed get_extended_attention_mask).
+    "transformers>=4.40,<5",
     "bert-score>=0.3.13",
     "torch>=2.1",
 ]

@@ -35,6 +35,11 @@ prompts (the last 100 scenarios of each file have no attack prompt).
 Scenarios are loaded in a fixed order (files sorted by path), so `--limit N`
 always selects the same scenarios.
 
+Version 2 of the safe prompts (distinct, realistic user requests in the same
+contexts) is generated with `scripts/generate_safe_prompts.py`; see
+[DATASET_V2.md](DATASET_V2.md). Pass `--scenario-root data/scenarios_v2` to
+the runners to use it.
+
 ## 3. Replay pools and stability (sections 5.2, 6.1; Tables 6.1 and 6.2)
 
 ```bash
@@ -75,7 +80,8 @@ python scripts/analyze.py tail-risk --attacks results/evaluator_attacks.csv \
 - `--include-metadata` reproduces the thesis prompt, which shows the judge
   the scenario's attack family. Without it the judge is blind; the blind
   setting is the recommended one (see CHANGES.md).
-- The judge's JSON is constrained by vLLM guided decoding (`outlines`).
+- The judge's JSON is constrained by vLLM guided decoding (`xgrammar` for the
+  version 2 runs; see CHANGES.md).
 - Seed of the judge for replay *i*: `777 + i`.
 - A pool enters the tail-risk estimate only if its 10 replays were all
   classified; the number of excluded pools is reported.

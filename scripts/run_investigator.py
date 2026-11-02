@@ -38,7 +38,7 @@ def main() -> None:
     parser.add_argument("--dataset-max-chars", type=int, default=1000,
                         help="context excerpt shown to the judge is cut to this length")
     parser.add_argument("--disable-guided-json", action="store_true")
-    parser.add_argument("--guided-backend", default="outlines")
+    parser.add_argument("--guided-backend", default="xgrammar")
     parser.add_argument("--workers", type=int, default=16)
     parser.add_argument("--max-pending", type=int, default=64)
     parser.add_argument("--max-retries", type=int, default=4)

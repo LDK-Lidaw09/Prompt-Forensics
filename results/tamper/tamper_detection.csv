@@ -1,0 +1,12 @@
+attack,L0 hashes,L1 chain,L2 signature,L3 anchor
+edit response,1.0,1.0,1.0,1.0
+edit response + its hash,0.0,1.0,1.0,1.0
+edit response + rebuild chain,0.0,0.0,1.0,1.0
+replace prompt + all hashes,0.0,0.0,1.0,1.0
+extra space in raw prompt,0.0,1.0,1.0,1.0
+edit capture time,0.0,1.0,1.0,1.0
+delete a record,0.0,1.0,1.0,1.0
+swap two records,0.0,1.0,1.0,1.0
+insert a forged record,0.0,0.0,1.0,1.0
+delete the last records,0.0,0.0,0.0,1.0
+rewrite with stolen key,0.0,0.0,0.0,1.0

@@ -84,7 +84,9 @@ def _already_judged(path: str) -> set[str]:
     if not os.path.exists(path):
         return set()
     with open(path, encoding="utf-8", newline="") as handle:
-        return {row["output_key"] for row in csv.DictReader(handle) if row.get("output_key")}
+        # Failed calls (judge_ok False, e.g. the server went down) are judged again.
+        return {row["output_key"] for row in csv.DictReader(handle)
+                if row.get("output_key") and row.get("judge_ok") in {"True", "true", "1"}}
 
 
 def iter_outputs(cfg: EvaluatorConfig, skip: set[str]) -> Iterator[dict[str, Any]]:
