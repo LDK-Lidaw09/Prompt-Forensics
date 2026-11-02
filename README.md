@@ -15,8 +15,25 @@ forensic artefact:
    cosine and BERTScore) and how often a pool of replays hides an unsafe
    answer (tail-risk).
 3. **Investigate** — LLM agents judge each replay (Evaluator Agent) and
-   analyse the prompt–response pair for adversarial intent
-   (LLM-as-Investigator).
+   assess whether the prompt–response pair shows signs of an attempted
+   attack (LLM-as-Investigator).
+
+## Demo in five minutes (no GPU)
+
+After the installation below (`pip install -e ".[dev]"` is enough):
+
+```bash
+python scripts/demo.py
+```
+
+The demo records six real interactions of the version 2 runs (prompts and
+Mistral-7B responses) in a signed, hash-chained evidence database, verifies
+it, tampers with copies of it in four ways (edited response, recomputed hash,
+rebuilt chain, truncation) and shows which check detects each change. It
+ends with the main results of the version 2 runs. The full tampering
+experiment (eleven attacks, 100 trials each) is
+`python scripts/tamper_experiment.py`; its results are in `results/tamper/`.
+
 
 ## Where each part of the thesis lives
 
@@ -29,7 +46,11 @@ forensic artefact:
 | 4.3.4, 5.3 Evaluator Agent and tail-risk | `agents/evaluator.py`, `experiments/evaluate.py`, `scripts/run_evaluator.py` |
 | 4.4, 5.4 LLM-as-Investigator | `agents/investigator.py`, `experiments/investigator.py`, `scripts/run_investigator.py` |
 | 4.5 Demo application | `app/streamlit_app.py` |
-| 5.1 Dataset (24,000 scenarios) | `data/scenarios/`, `src/prompt_forensics/scenarios.py` |
+| 4.2.3 Tampering experiment, external anchors (RFC 3161) | `scripts/tamper_experiment.py`, `scripts/anchor_evidence.py`, `results/tamper/` |
+| 5.1 Dataset, version 2 (23,376 scenarios: 21,600 attack prompts, 19,981 legitimate prompts) | `data/scenarios_v2/`, `scripts/generate_safe_prompts.py`, `docs/DATASET_V2.md` |
+| 5.1 Dataset, version 1 (first runs) | `data/scenarios/` |
+| Version 2 runs (100 replays per prompt, Evaluator, five Investigators) | `scripts/run_gpu_shard.sh`, `docs/RUNS_V2.md` |
+| Chapter 6, version 2 results | `scripts/analysis_v2/`, `results/v2/tables/` |
 | Tables 6.1–6.6 | `src/prompt_forensics/experiments/analysis.py`, `scripts/analyze.py` |
 | Pilot study (Dec. 2025) | `agents/repository_investigator.py`, `experiments/pilot_investigator.py`, `results/pilot_2025-12/` |
 
@@ -42,7 +63,11 @@ src/prompt_forensics/   the library (every computation lives here)
   experiments/          batch runners and result tables
 scripts/                command-line entry points for the experiments
 app/streamlit_app.py    demo interface (single file, calls the library only)
-data/scenarios/         the dataset: 6 attack families x 4 domains
+data/scenarios_v2/      the dataset (version 2): 6 attack families x 4 domains
+data/scenarios/         the dataset of the first runs (version 1)
+data/second_judge/      sample of 20,203 replays for the second Evaluator
+results/v2/tables/      result tables of the version 2 runs
+results/tamper/         results of the tampering experiment
 results/pilot_2025-12/  results of the pilot study
 tests/                  unit and end-to-end tests (no GPU, no model server)
 docs/                   architecture, reproduction guide, change log
@@ -76,6 +101,7 @@ pytest
 
 ```bash
 # 1. Replay pools: 10 replays per scenario, seeds 1234..1243
+#    (the version 2 runs use 100 replays: see docs/RUNS_V2.md)
 python scripts/run_replays.py --run-mode attacks --resume \
     --output-csv results/robustness_attacks.csv --output-jsonl results/replays_attacks.jsonl
 # 2. Evaluator Agent on every replay
@@ -113,6 +139,8 @@ simulator.
 - [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) — exact commands and settings of every experiment.
 - [docs/CHANGES.md](docs/CHANGES.md) — every behaviour change from the original research code, and what it means for the reported numbers.
 - [docs/DATASET_V2.md](docs/DATASET_V2.md) — why and how the safe prompts are regenerated (dataset version 2).
+- [docs/RUNS_V2.md](docs/RUNS_V2.md) — how the version 2 runs were executed on GPUs.
+- [scripts/analysis_v2/README.md](scripts/analysis_v2/README.md) — how the version 2 result tables are computed.
 
 ## Testing
 

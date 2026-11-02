@@ -414,6 +414,7 @@ def test_batch_generator_never_resubmits_the_same_requests(tmp_path):
 
 
 def test_api_key_variable_order(monkeypatch):
+    pytest.importorskip("anthropic")
     from prompt_forensics.datagen import generator
 
     monkeypatch.delenv("PF_ANTHROPIC_API_KEY", raising=False)

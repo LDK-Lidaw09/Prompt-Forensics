@@ -53,7 +53,6 @@ Two pods, each with one A100 80 GB and 150 GB of disk:
 
 ```bash
 git clone https://github.com/LDK-Lidaw09/Prompt-Forensics.git && cd Prompt-Forensics
-git checkout claude/safe-prompts-v2
 export HF_TOKEN=hf_...
 nohup bash scripts/run_gpu_shard.sh 0 > shard0.log 2>&1 &   # 1 on the second pod
 tail -f results/v2/shard0/steps.log
