@@ -11,7 +11,10 @@ Run it from the repository root::
 Tabs:
 
 - **Overview**     what PSI does and where each part lives in the interface.
-- **Capture**      send a prompt, store it as signed evidence, self-audit it.
+- **Capture**      send a prompt, store it as signed evidence, self-audit it,
+                   or load real interactions of the version 2 runs.
+- **Replay explorer** the 100 recorded replays of real prompts, with the
+                   Evaluator verdict of each one.
 - **Red team**     toy adversary that rewrites a prompt into an attack.
 - **Replay**       replay a stored prompt, compare it with the original and
                    measure the robustness of a replay pool.
@@ -26,8 +29,11 @@ Tabs:
 from __future__ import annotations
 
 import difflib
+import gzip
+import html
 import io
 import json
+import re
 import shutil
 import sqlite3
 import sys
@@ -47,6 +53,7 @@ sys.path.insert(0, str(ROOT / "scripts"))  # tamper_experiment.py: the tampering
 from prompt_forensics.agents.adversary import ATTACK_TEMPLATES, run_attack  # noqa: E402
 from prompt_forensics.agents.comparators import judge_replay_safety, judge_replay_similarity  # noqa: E402
 from prompt_forensics.agents.repository_investigator import investigate, is_detected  # noqa: E402
+from prompt_forensics.canonical import build_interaction_payload, prompt_id  # noqa: E402
 from prompt_forensics.agents.replay_group import evaluate_groups, parse_replay_files  # noqa: E402
 from prompt_forensics.config import get_settings  # noqa: E402
 from prompt_forensics.experiments import analysis  # noqa: E402
@@ -68,6 +75,9 @@ from tamper_experiment import (  # noqa: E402
 
 LANGUAGES = ["(none)", "English", "French", "Spanish", "German"]
 RESULTS_V2 = ROOT / "results" / "v2" / "tables"
+EXAMPLES_V2 = ROOT / "data" / "demo" / "examples_v2.json.gz"  # scripts/build_demo_examples.py
+UNSAFE = ("suspicious", "malicious")
+VERDICT_COLOURS = {"safe": "#2e7d32", "suspicious": "#f39c12", "malicious": "#c0392b"}
 THESIS_VICTIM = "Mistral-7B"  # the victim reported in the thesis
 
 # Tampering attacks offered in the Evidence tab (from scripts/tamper_experiment.py).
@@ -144,6 +154,46 @@ def stored_prompt_picker(label: str, key: str, record_types: tuple[str, ...] = (
     return st.selectbox(label, list(labels), format_func=labels.get, key=key)
 
 
+@st.cache_data(show_spinner=False)
+def load_examples() -> list[dict[str, Any]]:
+    """Real prompts of the version 2 runs with their 100 replays and verdicts."""
+    if not EXAMPLES_V2.exists():
+        return []
+    with gzip.open(EXAMPLES_V2, "rt", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def example_label(ex: dict[str, Any]) -> str:
+    kind = ("attack · " + ex["attack_type"].replace("_", " ") if ex["run_mode"] == "attacks"
+            else "legitimate" + (" · resembling an attack" if ex.get("safe_kind") == "hard_negative" else ""))
+    return f"{ex['scenario_id']} · {ex['domain']} · {kind}"
+
+
+def example_payload(ex: dict[str, Any], replay: dict[str, Any]) -> dict[str, Any]:
+    return build_interaction_payload(
+        prompt=ex["model_input"], model=ex["model"],
+        params={"temperature": ex["temperature"], "max_tokens": ex["max_tokens"], "seed": replay["seed"]},
+        timestamp="2026-11-01T00:00:00Z", user_id="runs-v2", session_id=None)
+
+
+def load_examples_into_store() -> tuple[int, int]:
+    """Store the first replay of each example as an interaction (once)."""
+    store, added, present = get_store(), 0, 0
+    for ex in load_examples():
+        first = ex["replays"][0]
+        payload = example_payload(ex, first)
+        if store.get_interaction(prompt_id(payload)):
+            present += 1
+            continue
+        store.append_interaction(
+            payload=payload, response_text=first["text"], record_type="live",
+            model_used=ex["model"], provider="vllm (version 2 runs)",
+            metadata={"source": "runs v2", "scenario_id": ex["scenario_id"], "run_mode": ex["run_mode"],
+                      "replay_idx": first["replay_idx"], "evaluator_verdict": first["verdict"]})
+        added += 1
+    return added, present
+
+
 # --------------------------------------------------------------------- sidebar
 
 def sidebar() -> dict[str, Any]:
@@ -188,6 +238,16 @@ def tab_capture(opts: dict[str, Any]) -> None:
     st.subheader("Capture an interaction")
     st.caption("The prompt is sent to the victim model, then stored with its Prompt ID, "
                "content hash, chain hash and ECDSA signature (thesis 4.2).")
+    if load_examples():
+        with st.container(border=True):
+            c1, c2 = st.columns([3, 1], vertical_alignment="center")
+            c1.markdown(f"**Real interactions, no model needed.** Store {len(load_examples())} "
+                        "interactions of the version 2 runs (six attacks, four legitimate prompts, "
+                        "with the response that Mistral-7B gave) in the evidence store.")
+            if c2.button("Load real examples", width="stretch"):
+                added, present = load_examples_into_store()
+                st.success(f"{added} interaction(s) stored" + (f", {present} already present" if present else "")
+                           + ". See them in the Evidence tab, and all their replays in the Replay explorer.")
     with st.form("capture"):
         prompt = st.text_area("Prompt", height=140)
         col1, col2 = st.columns(2)
@@ -378,6 +438,85 @@ def replay_across_models(source_id: str, opts: dict[str, Any]) -> None:
         download_csv(df, "bulk_replay.csv")
 
 
+# ---------------------------------------------------------- Replay explorer tab
+
+def verdict_strip(replays: list[dict[str, Any]]) -> str:
+    """One square per replay, coloured by the Evaluator verdict."""
+    cells = "".join(
+        f'<span title="replay {r["replay_idx"] + 1} (seed {r["seed"]}): {html.escape(r["verdict"])}" '
+        f'style="display:inline-block;width:14px;height:14px;margin:2px;border-radius:3px;'
+        f'background:{VERDICT_COLOURS.get(r["verdict"], "#b0b7c3")}"></span>'
+        for r in replays)
+    legend = " ".join(
+        f'<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{c};'
+        f'margin:0 4px 0 12px"></span>{v}' for v, c in VERDICT_COLOURS.items())
+    return (f'<div style="max-width:{20 * 25}px;line-height:0">{cells}</div>'
+            f'<div style="font-size:0.85rem;color:#555;margin-top:6px">{legend}'
+            '<span style="margin-left:12px">(one square per replay, in seed order)</span></div>')
+
+
+def tab_replay_explorer() -> None:
+    st.subheader("Replay explorer")
+    examples = load_examples()
+    if not examples:
+        st.info("The examples file `data/demo/examples_v2.json.gz` is missing "
+                "(see scripts/build_demo_examples.py).")
+        return
+    st.caption("Real prompts of the version 2 runs. Each was replayed 100 times on Mistral-7B "
+               "(temperature 0.2, seeds 1234 to 1333), and the Evaluator (Qwen3-14B) judged every "
+               "response without knowing whether the prompt was an attack.")
+    ex = st.selectbox("Prompt", examples, format_func=example_label)
+    replays = ex["replays"]
+    counts = {v: sum(r["verdict"] == v for r in replays) for v in VERDICT_COLOURS}
+    unsafe = [r for r in replays if r["verdict"] in UNSAFE]
+    first = replays[0]
+
+    with st.container(border=True):
+        kind = "Attack prompt" if ex["run_mode"] == "attacks" else "Legitimate prompt"
+        extra = (f" · from {ex['benchmark_source']}" if ex.get("benchmark_source") else
+                 " · written to resemble an attack" if ex.get("safe_kind") == "hard_negative" else "")
+        st.markdown(f"**{kind}** · {ex['domain']} · {ex['attack_type'].replace('_', ' ')}{extra}")
+        st.write(ex["prompt"])
+        with st.expander("System prompt and attached document"):
+            st.markdown("**System prompt**")
+            st.write(ex["system_prompt"])
+            st.markdown("**Document**")
+            st.write(ex["document"])
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Replays", len(replays))
+    c2.metric("Safe", counts["safe"])
+    c3.metric("Suspicious", counts["suspicious"])
+    c4.metric("Malicious", counts["malicious"])
+    st.html(verdict_strip(replays))
+
+    if ex["run_mode"] == "attacks" and unsafe:
+        if first["verdict"] in UNSAFE:
+            st.info(f"The first replay is already judged {first['verdict']}.")
+        else:
+            nth = unsafe[0]["replay_idx"] + 1
+            st.warning(f"An examiner who replayed this prompt once would have seen a safe response. "
+                       f"The first unsafe response appears at replay {nth}, and "
+                       f"{len(unsafe)} of the {len(replays)} responses are unsafe.")
+    elif ex["run_mode"] == "safe" and unsafe:
+        st.info(f"{len(unsafe)} response(s) to this legitimate prompt were judged unsafe. In the "
+                "version 2 runs such cases are mostly responses that invent personal or medical "
+                "data, judged suspicious: read them below and decide.")
+
+    shown = st.radio("Show", ["unsafe responses", "safe responses", "all"], horizontal=True)
+    selected = (unsafe if shown == "unsafe responses"
+                else [r for r in replays if r["verdict"] not in UNSAFE] if shown == "safe responses"
+                else replays)
+    for r in selected[:30]:
+        title = f"Replay {r['replay_idx'] + 1} · seed {r['seed']} · {r['verdict']}"
+        with st.expander(title):
+            st.write(r["text"])
+            if r.get("summary"):
+                st.caption(f"Evaluator: {r['summary']}")
+    if len(selected) > 30:
+        st.caption(f"First 30 of {len(selected)} shown.")
+
+
 # ------------------------------------------------------------- Investigator tab
 
 def tab_investigator(opts: dict[str, Any]) -> None:
@@ -426,9 +565,12 @@ def tab_experiments(opts: dict[str, Any]) -> None:
     st.subheader("Dataset experiments")
     st.caption("Small interactive runs. For the full experiments use the scripts in `scripts/` "
                "(see docs/REPRODUCIBILITY.md).")
-    replays, investigator, pilot, grouped, analyse = st.tabs(
-        ["Replay robustness", "Investigator (5.4)", "Pilot investigator", "Grouped evaluator",
-         "Analyse results"])
+    replays, investigator, analyse, advanced = st.tabs(
+        ["Replay robustness", "Investigator (5.4)", "Analyse results", "Advanced"])
+    with advanced:
+        st.caption("Tools of the pilot study (December 2025) and of the first runs.")
+        pilot = st.expander("Pilot investigator (repository Investigator)")
+        grouped = st.expander("Grouped evaluator (score uploaded replay files)")
 
     with replays:
         run_mode = st.selectbox("Run mode", RUN_MODES, key="rr_mode")
@@ -541,6 +683,49 @@ def tab_experiments(opts: dict[str, Any]) -> None:
 EVIDENCE_COLUMNS = ["id", "created_at", "record_type", "model_used", "prompt_text", "prompt_id", "chain_hash"]
 
 
+def chain_html(records: list[dict[str, Any]], problems: list[str], limit: int = 6) -> str:
+    """The last records of a store as linked blocks; records named in a problem are red."""
+    bad = {int(m) for p in problems for m in re.findall(r"interaction (\d+)", p)}
+    ids = [r["id"] for r in records]
+    # Show the last records, or the first altered one and the records around it.
+    start = max(0, len(records) - limit)
+    if bad and min(bad) in ids:
+        start = min(start, max(0, ids.index(min(bad)) - 1))
+    shown = records[start:start + limit]
+    blocks = []
+    if start:
+        blocks.append(f'<div style="align-self:center;color:#777">… {start} earlier</div>')
+    for i, r in enumerate(shown):
+        broken = r["id"] in bad
+        colour, fill = ("#c0392b", "#fdecea") if broken else ("#1f4e79", "#eef3f8")
+        prompt = html.escape((r.get("prompt_text") or "")[-60:].replace("\n", " "))
+        prev = html.escape((r.get("prev_chain_hash") or "")[:8])
+        blocks.append(
+            f'<div style="border:2px solid {colour};background:{fill};border-radius:8px;'
+            f'padding:8px 10px;min-width:150px;max-width:180px;font-size:0.78rem">'
+            f'<div style="font-weight:600;color:{colour}">#{r["id"]} · {html.escape(r["record_type"])}'
+            f'{" · altered" if broken else ""}</div>'
+            f'<div style="color:#444;margin:4px 0;height:3.2em;overflow:hidden">…{prompt}</div>'
+            f'<div style="font-family:monospace;color:#555">prev {prev}…</div>'
+            f'<div style="font-family:monospace;color:#555">hash {html.escape(r["chain_hash"][:8])}…</div>'
+            f'<div style="color:#555">{"signed" if r.get("signature") else "not signed"}</div></div>')
+        if i < len(shown) - 1:
+            arrow_colour = "#c0392b" if broken or shown[i + 1]["id"] in bad else "#1f4e79"
+            blocks.append(f'<div style="align-self:center;color:{arrow_colour};font-size:1.4rem">→</div>')
+    if start + limit < len(records):
+        blocks.append(f'<div style="align-self:center;color:#777">… {len(records) - start - limit} later</div>')
+    return ('<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:stretch;margin:8px 0">'
+            + "".join(blocks) + "</div>")
+
+
+def store_records(db_path: str | Path) -> list[dict[str, Any]]:
+    conn = sqlite3.connect(db_path)
+    try:
+        return read_rows(conn)
+    finally:
+        conn.close()
+
+
 def show_report(report, what: str) -> None:
     if report.ok:
         st.success(f"{what}: all {report.checked} records verified, no problem found.")
@@ -594,7 +779,9 @@ def tab_evidence() -> None:
         trusted = (uploaded_key.getvalue().decode("ascii") if uploaded_key
                    else local_key.read_text() if local_key.exists() else None)
         anchors = [json.loads(f.getvalue()) for f in uploaded_anchors or []]
-        show_report(store.verify(trusted, anchors=anchors), "Verification")
+        report = store.verify(trusted, anchors=anchors)
+        show_report(report, "Verification")
+        st.html(chain_html(store_records(settings.db_path), report.problems))
     b2.download_button("Download an anchor of the current head",
                        json.dumps(store.anchor(), indent=2).encode("utf-8"), "psi_anchor.json",
                        "application/json",
@@ -634,7 +821,12 @@ def tab_evidence() -> None:
             finally:
                 conn.close()
             report = type(store)(copy).verify(trusted, anchors=[anchor])
+            tampered = store_records(copy)
         show_report(report, "Tampered copy")
+        st.markdown("**Tampered copy** (records named by a problem are in red)")
+        st.html(chain_html(tampered, report.problems))
+        if any(p.startswith("anchor") for p in report.problems):
+            st.caption("Only the anchor kept outside the database reveals this change.")
 
 
 # --------------------------------------------------------------- Overview tab
@@ -654,7 +846,8 @@ def tab_overview() -> None:
         st.markdown("How does the logged response compare with the responses obtained by "
                     "replaying its prompt?")
         st.caption("Replays under a documented sampling configuration, with one recorded seed per "
-                   "replay; Consistency and Fidelity (thesis 4.3, 5.2). Tab: **Replay**.")
+                   "replay; Consistency and Fidelity (thesis 4.3, 5.2). Tabs: **Replay explorer** "
+                   "(recorded runs), **Replay**.")
     with c3.container(border=True):
         st.markdown("##### 3. Investigate")
         st.markdown("Does the interaction show signs of an attempted attack?")
@@ -662,9 +855,10 @@ def tab_overview() -> None:
                    "attempted attack), both LLM judges (thesis 4.4). Tabs: **Investigator**, "
                    "**Experiments**.")
     st.markdown("")
-    st.markdown("**Suggested tour.** Capture a prompt, look at its record in **Evidence**, verify "
-                "the store, then tamper with a copy and see which check detects the change. "
-                "**Results v2** shows the results of the full runs.")
+    st.markdown("**Suggested tour.** In **Capture**, load the real examples. In **Evidence**, verify "
+                "the store, then tamper with a copy and see which check detects the change. In "
+                "**Replay explorer**, see how the 100 replays of one attack prompt mix safe and unsafe "
+                "responses. **Results v2** shows the results over the whole dataset.")
 
 
 # ------------------------------------------------------------- Results v2 tab
@@ -756,23 +950,25 @@ def main() -> None:
         st.warning("Simulator mode: the model only echoes the prompt. Hashes, chain, signatures and "
                    "verification are real. For real answers, start LM Studio and choose "
                    "“LM Studio list” in the sidebar, or set LIVE_MODEL.")
-    tabs = st.tabs(["Overview", "Capture", "Red team", "Replay", "Investigator", "Experiments",
-                    "Evidence", "Results v2"])
+    tabs = st.tabs(["Overview", "Capture", "Evidence", "Replay explorer", "Replay", "Investigator",
+                    "Red team", "Experiments", "Results v2"])
     with tabs[0]:
         tab_overview()
     with tabs[1]:
         tab_capture(opts)
     with tabs[2]:
-        tab_red_team(opts)
-    with tabs[3]:
-        tab_replay(opts)
-    with tabs[4]:
-        tab_investigator(opts)
-    with tabs[5]:
-        tab_experiments(opts)
-    with tabs[6]:
         tab_evidence()
+    with tabs[3]:
+        tab_replay_explorer()
+    with tabs[4]:
+        tab_replay(opts)
+    with tabs[5]:
+        tab_investigator(opts)
+    with tabs[6]:
+        tab_red_team(opts)
     with tabs[7]:
+        tab_experiments(opts)
+    with tabs[8]:
         tab_results()
 
 

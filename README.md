@@ -34,6 +34,18 @@ ends with the main results of the version 2 runs. The full tampering
 experiment (eleven attacks, 100 trials each) is
 `python scripts/tamper_experiment.py`; its results are in `results/tamper/`.
 
+The interface gives the same tour with a mouse (`pip install -e ".[ui]"`):
+
+```bash
+LIVE_MODEL=sim:victim JUDGE_MODEL=sim:judge streamlit run app/streamlit_app.py
+```
+
+In **Capture**, *Load real examples* stores ten interactions of the version 2
+runs; **Evidence** verifies the store, draws its hash chain and tampers with
+a copy; **Replay explorer** shows the 100 recorded replays of each example
+with the Evaluator verdict of each one; **Results v2** shows the result
+tables. The examples are built by `scripts/build_demo_examples.py`.
+
 
 ## Where each part of the thesis lives
 

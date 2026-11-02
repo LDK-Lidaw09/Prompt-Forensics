@@ -10,13 +10,18 @@ from streamlit.testing.v1 import AppTest  # noqa: E402
 APP = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
 
 
+def button(app, label):
+    return next(b for b in app.button if b.label == label)
+
+
 def test_app_renders_and_captures(no_ml):
     app = AppTest.from_file(str(APP), default_timeout=60).run()
     assert not app.exception
     labels = {t.label for t in app.tabs}
-    assert {"Capture", "Red team", "Replay", "Investigator", "Experiments", "Evidence"} <= labels
+    assert {"Capture", "Red team", "Replay", "Investigator", "Experiments", "Evidence",
+            "Replay explorer", "Results v2"} <= labels
     app.text_area[0].input("Hello PSI")
-    app.button[0].click().run()
+    button(app, "Send").click().run()
     assert not app.exception
     assert any("prompt_id" in str(j.value) for j in app.json)
 
@@ -25,7 +30,7 @@ def test_app_tampering_demo_detects_change(no_ml):
     app = AppTest.from_file(str(APP), default_timeout=60).run()
     for prompt in ("First prompt", "Second prompt"):
         app.text_area[0].input(prompt)
-        app.button[0].click().run()
+        button(app, "Send").click().run()
     for name in ("Change the response and rebuild the hash chain (no key)",
                  "Delete the last record (truncation)"):
         next(s for s in app.selectbox if s.label == "Tampering").set_value(name).run()
@@ -43,3 +48,15 @@ def test_app_results_tab_renders(no_ml):
     assert not app.exception
     assert "Results v2" in {t.label for t in app.tabs}
     assert any("within 100 replays" in m.label for m in app.metric)
+
+
+def test_app_loads_real_examples(no_ml):
+    app = AppTest.from_file(str(APP), default_timeout=60).run()
+    button(app, "Load real examples").click().run()
+    assert not app.exception
+    assert any("10 interaction(s) stored" in s.value for s in app.success)
+    button(app, "Load real examples").click().run()
+    assert any("10 already present" in s.value for s in app.success)
+    button(app, "Verify the evidence store").click().run()
+    assert any("no problem found" in s.value for s in app.success)
+    assert any(m.label == "Malicious" for m in app.metric)  # replay explorer rendered
