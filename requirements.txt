@@ -10,5 +10,5 @@ bert-score>=0.3.13
 torch>=2.1
 anthropic>=1.0
 numpy>=1.26
-streamlit>=1.46
+streamlit>=1.50
 pytest>=8
