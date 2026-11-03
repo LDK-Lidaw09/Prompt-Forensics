@@ -576,6 +576,14 @@ def tab_investigator(opts: dict[str, Any]) -> None:
         format_func=lambda pid: f"{by_id[pid]['record_type']} · {pid[:12]}… · {by_id[pid]['prompt_text'][:60]!r}",
     )
     answer_from = st.selectbox("Answer to analyse (from)", chosen or ["–"])
+    if get_settings().judge_model.startswith("sim:"):
+        st.html(ui.callout(
+            "amber", "ℹ️", "The judge is the offline simulator (<code>JUDGE_MODEL=sim:judge</code>). It only "
+                           "echoes its input and cannot write a report, so the Investigator would fail. Restart "
+                           "the interface with a real judge, for example <code>JUDGE_MODEL=lmstudio:&lt;model&gt;</code> "
+                           "with LM Studio running, to investigate here. The Evaluator verdicts of the version 2 "
+                           "runs are shown in the Replay explorer."))
+        return
     if st.button("Investigate") and chosen:
         answer = get_store().get_interaction(answer_from)["response_text"]
         prompts = [{"id": pid, "role": "user", "text": by_id[pid]["prompt_text"]} for pid in chosen]
