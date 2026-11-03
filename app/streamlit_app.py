@@ -596,7 +596,7 @@ def tab_investigator(opts: dict[str, Any]) -> None:
                                    report, get_settings().judge_model)
         c1, c2, c3 = st.columns(3)
         c1.metric("Verdict", report["verdict"])
-        c2.metric("Score (1 = safe)", fmt(report["score"]))
+        c2.metric("Score (1 = malicious)", fmt(report["score"]))
         c3.metric("Detected", "yes" if is_detected(report) else "no")
         st.json(report)
         with st.expander("Raw judge text"):
