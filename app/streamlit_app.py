@@ -177,29 +177,47 @@ def example_label(ex: dict[str, Any]) -> str:
     return f"{ex['scenario_id']} · {ex['domain']} · {kind}"
 
 
-def example_payload(ex: dict[str, Any], replay: dict[str, Any]) -> dict[str, Any]:
+def example_payload(ex: dict[str, Any], replay: dict[str, Any],
+                    timestamp: str = "2026-11-01T00:00:00Z") -> dict[str, Any]:
     return build_interaction_payload(
         prompt=ex["model_input"], model=ex["model"],
         params={"temperature": ex["temperature"], "max_tokens": ex["max_tokens"], "seed": replay["seed"]},
-        timestamp="2026-11-01T00:00:00Z", user_id="runs-v2", session_id=None)
+        timestamp=timestamp, user_id="runs-v2", session_id=None)
+
+
+REPLAY_TIMESTAMP = "2026-11-01T01:00:00Z"  # the recorded replays of the version 2 runs
 
 
 def load_examples_into_store() -> tuple[int, int]:
-    """Store the first replay of each example as an interaction (once)."""
+    """Store each example once: its first response as the interaction, then its 100 recorded
+    replays (seeds 1234 to 1333) with the verdict the Evaluator gave each of them."""
     st.session_state.pop("verify_report", None)  # the store changes: an old report would mislead
     store, added, present = get_store(), 0, 0
     for ex in load_examples():
         first = ex["replays"][0]
         payload = example_payload(ex, first)
-        if store.get_interaction(prompt_id(payload)):
+        source_id = prompt_id(payload)
+        if store.get_interaction(source_id):
             present += 1
-            continue
-        store.append_interaction(
-            payload=payload, response_text=first["text"], record_type="live",
-            model_used=ex["model"], provider="vllm (version 2 runs)",
-            metadata={"source": "runs v2", "scenario_id": ex["scenario_id"], "run_mode": ex["run_mode"],
-                      "replay_idx": first["replay_idx"], "evaluator_verdict": first["verdict"]})
-        added += 1
+        else:
+            store.append_interaction(
+                payload=payload, response_text=first["text"], record_type="live",
+                model_used=ex["model"], provider="vllm (version 2 runs)",
+                metadata={"source": "runs v2", "scenario_id": ex["scenario_id"], "run_mode": ex["run_mode"],
+                          "replay_idx": first["replay_idx"], "evaluator_verdict": first["verdict"]})
+            added += 1
+        for replay in ex["replays"]:  # also completes a store loaded before the replays were added
+            replay_payload = example_payload(ex, replay, REPLAY_TIMESTAMP)
+            if store.get_interaction(prompt_id(replay_payload)):
+                continue
+            stored = store.append_interaction(
+                payload=replay_payload, response_text=replay["text"],
+                record_type="replay", model_used=ex["model"], provider="vllm (version 2 runs)",
+                metadata={"source": "runs v2", "source_prompt_id": source_id,
+                          "replay_idx": replay["replay_idx"]})
+            verdict = {"verdict": replay["verdict"], "score": replay.get("score"),
+                       "risk_types": replay.get("risk_types") or [], "summary": replay.get("summary") or ""}
+            store.add_annotation(stored.id, EVALUATOR_KIND, verdict, "Qwen/Qwen3-14B (version 2 runs)")
     return added, present
 
 
@@ -252,7 +270,8 @@ def tab_capture(opts: dict[str, Any]) -> None:
             c1, c2 = st.columns([3, 1], vertical_alignment="center")
             c1.markdown(f"**Real interactions, no model needed.** Store {len(load_examples())} "
                         "interactions of the version 2 runs (six attacks, four legitimate prompts, "
-                        "with the response that Mistral-7B gave) in the evidence store.")
+                        "with the response that Mistral-7B gave) in the evidence store, together "
+                        "with their 100 recorded replays and the Evaluator verdict of each one.")
             if c2.button("Load real examples", type="primary", width="stretch"):
                 added, present = load_examples_into_store()
                 st.success(f"{added} interaction(s) stored" + (f", {present} already present" if present else "")
