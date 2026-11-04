@@ -84,3 +84,31 @@ on the Hub; only the aggregated tables go to this repository.
 | `evaluator.csv` | safe/unsafe verdict of every replay |
 | `investigator_<mode>_r<n>_<judge>.csv` | Investigator report per prompt and judge |
 | `steps.log`, `environment.txt`, `vllm_*.log` | timings, GPU, vLLM version, commit |
+
+## Sensitivity runs (one GPU, about 6 to 7 hours)
+
+Three checks that each change one factor and keep every other setting of the
+main runs:
+
+1. **Temperature.** 1,000 prompts (stratified, nested in the ablation
+   sample) replayed 20 times by Mistral-7B at temperatures 0, 0.2, 0.7 and
+   1.0, seeds 1234 + i, each replay judged by the Evaluator.
+2. **Same seed, same text?** A second pass at 0.2 with the same seeds
+   (10 replays per prompt), compared text for text with the first pass.
+   It measures whether a recorded seed reproduces a replay exactly in this
+   environment, or only controls the randomness.
+3. **Investigator without the answer.** The Qwen3-14B Investigator, same
+   prompt and settings, on 2,000 prompts with the victim's answer replaced
+   by a fixed placeholder (`run_investigator.py --no-output`). The baseline
+   with the answer is the main run on the same prompts (paired by
+   `scenario_id`), and, on the 1,000 temperature prompts, the same run.
+
+```bash
+export HF_TOKEN=hf_...   # write access
+nohup bash scripts/run_sensitivity.sh > sensitivity.log 2>&1 &
+tail -f results/v2/sensitivity/steps.log
+```
+
+Results go to `results/v2/sensitivity/` (copied to `sensitivity/` on the
+Hub every 30 minutes) and `results/v2/sensitivity.tar.gz`; the tables come
+from `scripts/analysis_v2/sensitivity.py`.
