@@ -14,6 +14,13 @@ attacks and safe replay files (serve one judge at a time with vLLM):
         --output-csv results/investigator_safe_qwen3_14b.csv --resume
 
 Then build Tables 6.4 to 6.6 with ``scripts/analyze.py investigator``.
+
+Ablation without the victim's answer (same prompt and settings, the output
+replaced by a fixed placeholder), on the scenarios of a scenario root:
+
+    python scripts/run_investigator.py --no-output --run-mode attacks \
+        --scenario-root results/v2/sensitivity/plan/ablation_attacks \
+        --judge Qwen/Qwen3-14B --output-csv results/v2/sensitivity/investigator_noout_attacks.csv --resume
 """
 
 import argparse
@@ -47,11 +54,15 @@ def main() -> None:
                         help="append to --output-csv and skip scenarios already investigated successfully")
     parser.add_argument("--include-raw", action="store_true", help="keep the judge's raw text in the CSV")
     args = parser.parse_args()
+    if args.no_output == bool(args.replays) or (args.no_output and not args.run_mode):
+        parser.error("give either --replays, or --no-output with --run-mode")
 
     run_investigator(InvestigatorRunConfig(
         replays=args.replays,
         output_csv=args.output_csv,
         judge_model=args.judge,
+        no_output=args.no_output,
+        run_mode=args.run_mode,
         output_jsonl=args.output_jsonl,
         scenario_root=args.scenario_root,
         max_tokens=args.max_tokens,
