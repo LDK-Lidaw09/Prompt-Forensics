@@ -34,7 +34,10 @@ from prompt_forensics.experiments.investigator import InvestigatorRunConfig, run
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--replays", required=True, help="replay JSONL written by run_replays.py")
+    parser.add_argument("--replays", help="replay JSONL written by run_replays.py")
+    parser.add_argument("--no-output", action="store_true",
+                        help="ablation: leave the victim's answer out (needs --run-mode, no --replays)")
+    parser.add_argument("--run-mode", choices=["attacks", "safe"], help="with --no-output")
     parser.add_argument("--judge", required=True, help="judge model id")
     parser.add_argument("--output-csv", required=True)
     parser.add_argument("--output-jsonl", help="optional detailed copy of every row")
