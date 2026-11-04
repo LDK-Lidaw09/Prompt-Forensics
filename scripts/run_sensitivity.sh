@@ -41,6 +41,7 @@ mkdir -p "$OUT"
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$OUT/steps.log"; }
 done_step() { [ -f "$OUT/.done_$1" ]; }
 mark_done() { touch "$OUT/.done_$1"; log "done: $1"; }
+# Needed even with BACKUP=0: Mistral-7B-Instruct-v0.3 is a gated model.
 [ -n "${HF_TOKEN:-}" ] || { echo "HF_TOKEN is not set (export HF_TOKEN=hf_..., no space after =)"; exit 1; }
 
 # ---- Environments (same as run_gpu_shard.sh) ---------------------------------------
@@ -78,7 +79,7 @@ for model in sys.argv[1:]:
 PY
 
 serve() {  # model, GPU memory share, extra vllm options
-    .venv-vllm/bin/vllm serve "$1" --port 8000 --gpu-memory-utilization "$2" --max-model-len 8192 ${3:-} \
+    .venv-vllm/bin/vllm serve "$1" --host 127.0.0.1 --port 8000 --gpu-memory-utilization "$2" --max-model-len 8192 ${3:-} \
         > "$OUT/vllm_${1##*/}.log" 2>&1 &
     VLLM_PID=$!
     SERVE_ARGS=("$@")

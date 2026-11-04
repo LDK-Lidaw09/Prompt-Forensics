@@ -16,7 +16,9 @@ Writes to results/v2/tables/:
   unsafe rate, and the share of prompts with at least one unsafe replay
   among 20 (Wilson 95 % interval);
 - sensitivity_seed.csv: replays of the first pass at 0.2 and of the second
-  pass with the same seeds, compared text for text;
+  pass with the same seeds, compared text for text, on the prompts whose
+  replays are all present in both passes; the interval is a bootstrap over
+  prompts (replays of one prompt are not independent);
 - sensitivity_ablation.csv: recall and false-positive rate of the Qwen3-14B
   Investigator with and without the victim's answer, on the same prompts,
   with McNemar's test (continuity correction) on the paired decisions.
@@ -36,6 +38,7 @@ import re
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, "src")
@@ -70,6 +73,18 @@ def ci(k: int, n: int) -> tuple[float, float, float]:
     return (k / n if n else math.nan), lo, hi
 
 
+def cluster_bootstrap(hits: pd.Series, groups: pd.Series, n_boot: int = 2000, seed: int = 0) -> tuple[float, float]:
+    """95 % percentile interval of a rate, resampling whole groups (prompts)."""
+    per_group = pd.DataFrame({"hit": hits.astype(float), "g": groups.values}).groupby("g").hit.agg(["sum", "count"])
+    if per_group.empty:
+        return math.nan, math.nan
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(per_group), size=(n_boot, len(per_group)))
+    sums, counts = per_group["sum"].to_numpy()[idx].sum(1), per_group["count"].to_numpy()[idx].sum(1)
+    rates = sums / counts
+    return float(np.quantile(rates, 0.025)), float(np.quantile(rates, 0.975))
+
+
 def mcnemar(b: int, c: int) -> tuple[float, float]:
     """Chi-square with continuity correction, (|b - c| - 1)^2 / (b + c), and its p-value (1 df)."""
     if b + c == 0:
@@ -90,7 +105,11 @@ for csv_path in sorted(S.glob("replays_*_t*.csv")):
     pools = pd.read_csv(csv_path).drop_duplicates(["scenario_id", "run_mode"], keep="last")
     pools = pools[pools.complete.astype(str).isin(["True", "true", "1"])]
     texts = read_replays(csv_path.with_suffix(".jsonl"))
-    same = texts.groupby("scenario_id").text.nunique().eq(1)
+    # Only pools with every requested replay present: a pool reduced to one
+    # surviving replay would otherwise count as "all identical".
+    counts = texts.groupby("scenario_id").replay_idx.nunique()
+    complete = counts[counts >= pools.num_requested.max()].index
+    same = texts[texts.scenario_id.isin(complete)].groupby("scenario_id").text.nunique().eq(1)
     e = ev[ev.input_file == csv_path.with_suffix(".jsonl").name]
     full = e.groupby("scenario_id").size()
     full = full[full >= pools.num_requested.max()].index  # pools with every replay judged
@@ -116,10 +135,16 @@ for second in sorted(S.glob("seedcheck_*_t02.jsonl")):
     a = read_replays(S / f"replays_{mode}_t02.jsonl")
     b = read_replays(second)
     m = a.merge(b, on=["scenario_id", "run_mode", "replay_idx", "seed"], suffixes=("_a", "_b"))
+    # Keep prompts whose replays 0 .. n-1 of the second pass all have a match.
+    expected = int(b.replay_idx.max()) + 1 if len(b) else 0
+    matched = m.groupby("scenario_id").replay_idx.nunique()
+    m = m[m.scenario_id.isin(matched[matched >= expected].index)]
     exact = m.text_a.eq(m.text_b)
-    p, lo, hi = ci(int(exact.sum()), len(m))
-    rows.append({"run_mode": mode, "replays_compared": len(m), "identical": int(exact.sum()),
-                 "identical_rate": p, "lo": lo, "hi": hi,
+    lo, hi = cluster_bootstrap(exact, m.scenario_id)
+    rows.append({"run_mode": mode, "prompts": m.scenario_id.nunique(),
+                 "prompts_left_out": int((matched < expected).sum()),
+                 "replays_compared": len(m), "identical": int(exact.sum()),
+                 "identical_rate": exact.mean() if len(m) else math.nan, "lo_bootstrap": lo, "hi_bootstrap": hi,
                  "pools_all_identical": exact.groupby(m.scenario_id).all().mean()})
 seed = pd.DataFrame(rows)
 seed.to_csv(T / "sensitivity_seed.csv", index=False)
@@ -137,6 +162,9 @@ def investigator(path: str | Path) -> pd.DataFrame:
 
 def compare(name: str, with_answer: pd.DataFrame, without: pd.DataFrame) -> list[dict]:
     m = with_answer.merge(without, on=["scenario_id", "run_mode"], suffixes=("_with", "_without"))
+    # Prompts of the ablation sample with no baseline row (should be 0 for the
+    # main runs, which investigated every prompt) are counted, not hidden.
+    unmatched = len(without) - len(m) if name.startswith("main") else 0
     failed = int((~m.ok_with | ~m.ok_without).sum())
     m = m[m.ok_with & m.ok_without]
     out = []
@@ -145,7 +173,8 @@ def compare(name: str, with_answer: pd.DataFrame, without: pd.DataFrame) -> list
         b = int((g.flag_with & ~g.flag_without).sum())   # flagged only with the answer
         c = int((~g.flag_with & g.flag_without).sum())   # flagged only without it
         chi2, pval = mcnemar(b, c)
-        row = {"baseline": name, "run_mode": mode, "measure": measure, "n": len(g), "failed_pairs_excluded": failed}
+        row = {"baseline": name, "run_mode": mode, "measure": measure, "n": len(g), "failed_pairs_excluded": failed,
+               "prompts_without_baseline": unmatched}
         for cond in ("with", "without"):
             p, lo, hi = ci(int(g[f"flag_{cond}"].sum()), len(g))
             row.update({f"{cond}_answer": p, f"{cond}_lo": lo, f"{cond}_hi": hi})

@@ -183,6 +183,8 @@ def test_sensitivity_plan_nests_the_temperature_sample(tmp_path):
     ablation = {s["id"] for name, r in roots.items() if name.startswith("ablation") for s in load_scenarios(r)}
     temperature = {s["id"] for name, r in roots.items() if name.startswith("temperature") for s in load_scenarios(r)}
     assert temperature <= ablation and (tmp_path / "plan.csv").exists()
+    assert ablation == {r["scenario_id"] for r in rows}
+    assert temperature == {r["scenario_id"] for r in rows if r["temperature_sample"]}
 
 
 def test_investigator_without_the_answer(tmp_path, monkeypatch):
