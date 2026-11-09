@@ -167,3 +167,45 @@ def test_evaluator_resume_judges_failed_calls_again(tmp_path):
     path = tmp_path / "evaluator.csv"
     pd.DataFrame({"output_key": ["a", "b"], "judge_ok": [True, False]}).to_csv(path, index=False)
     assert _already_judged(str(path)) == {"a"}
+
+
+def test_sensitivity_plan_nests_the_temperature_sample(tmp_path):
+    from prompt_forensics.experiments.plan import sensitivity_plan, write_sensitivity_plan
+    from prompt_forensics.scenarios import load_scenarios
+
+    scenarios = _plan_scenarios()
+    rows = sensitivity_plan(scenarios, ablation=12, temperature=6, seed=3)
+    assert len(rows) == 12 and sum(r["temperature_sample"] for r in rows) == 6
+    assert rows == sensitivity_plan(scenarios, ablation=12, temperature=6, seed=3)
+    with pytest.raises(ValueError):
+        sensitivity_plan(scenarios, ablation=4, temperature=6)
+    roots = {r.name: r for r in write_sensitivity_plan(scenarios, rows, tmp_path)}
+    ablation = {s["id"] for name, r in roots.items() if name.startswith("ablation") for s in load_scenarios(r)}
+    temperature = {s["id"] for name, r in roots.items() if name.startswith("temperature") for s in load_scenarios(r)}
+    assert temperature <= ablation and (tmp_path / "plan.csv").exists()
+    assert ablation == {r["scenario_id"] for r in rows}
+    assert temperature == {r["scenario_id"] for r in rows if r["temperature_sample"]}
+
+
+def test_investigator_without_the_answer(tmp_path, monkeypatch):
+    prompts = []
+    answer = json.dumps({"decision": "attack", "maliciousness_score": 0.8, "adversarial_types": [],
+                         "guardrail_violations": [], "risk_markers": [], "attack_succeeded": False,
+                         "summary": "s"})
+
+    def judge(prompt, model, params):
+        prompts.append(prompt)
+        return LLMResponse(answer, model, "test", 1)
+
+    monkeypatch.setattr(investigator_agent, "call_llm", judge)
+    out = tmp_path / "noout.csv"
+    n = run_investigator(InvestigatorRunConfig(replays=None, output_csv=str(out), judge_model="j",
+                                               no_output=True, run_mode="safe", limit=3, workers=1),
+                         progress=lambda m: None)
+    rows = pd.read_csv(out)
+    assert n == 3 and rows["gold_label"].eq("safe").all() and rows["correct"].eq(0).all()
+    assert rows["replay_idx"].isna().all()
+    assert all(investigator_agent.NO_OUTPUT_TEXT in p for p in prompts)
+    with pytest.raises(ValueError):
+        run_investigator(InvestigatorRunConfig(replays=None, output_csv=str(out), judge_model="j"),
+                         progress=lambda m: None)

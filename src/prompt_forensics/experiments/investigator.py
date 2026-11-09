@@ -8,6 +8,13 @@ file: ``attack`` for an attacks file, ``safe`` for a safe file.
 
 Run it once per (judge, run mode); :func:`prompt_forensics.experiments.analysis.investigator_tables`
 then combines the attacks and safe CSVs of each judge into Tables 6.4 to 6.6.
+
+Ablation without the response (``no_output=True``): the scenarios of
+``scenario_root`` for ``run_mode`` are investigated with the same prompt and
+settings, but the victim's answer is replaced by
+:data:`~prompt_forensics.agents.investigator.NO_OUTPUT_TEXT`. No replay file
+is needed; ``replay_idx`` is left empty and ``attack_succeeded`` has no
+meaning in that condition.
 """
 
 from __future__ import annotations
@@ -23,11 +30,12 @@ from typing import Any, Callable, Iterator
 
 from ..agents.investigator import (
     DEFAULT_DATASET_MAX_CHARS,
+    NO_OUTPUT_TEXT,
     investigate_pair,
     pick_representative_replay,
 )
 from ..config import get_settings
-from ..scenarios import load_scenarios, scenario_id
+from ..scenarios import load_scenarios, scenario_id, select_scenarios
 from .io import CsvWriter, JsonlWriter, read_jsonl
 
 # Same columns as the original script, so its CSVs can be analysed and resumed.
@@ -47,9 +55,11 @@ GOLD_LABEL = {"attacks": "attack", "safe": "safe"}
 class InvestigatorRunConfig:
     """Parameters of one Investigator run. Defaults are the thesis settings."""
 
-    replays: str                          # replay JSONL file (one run mode)
+    replays: str | None                   # replay JSONL file (one run mode); None with no_output
     output_csv: str
     judge_model: str
+    no_output: bool = False               # ablation: leave the victim's answer out
+    run_mode: str | None = None           # with no_output: "attacks" or "safe"
     output_jsonl: str | None = None
     scenario_root: str | None = None      # default: SCENARIO_ROOT
     temperature: float = 0.0
@@ -82,6 +92,9 @@ def _done_scenarios(path: str) -> set[str]:
 def iter_pairs(cfg: InvestigatorRunConfig, scenarios: dict[str, dict], skip: set[str],
                progress: Callable[[str], None]) -> Iterator[tuple[dict, dict]]:
     """``(scenario, replay)`` pairs to investigate, in file order."""
+    if cfg.no_output:
+        yield from _pairs_without_output(cfg, scenarios, skip)
+        return
     pools: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for _, _, obj in read_jsonl([cfg.replays]):
         if obj.get("scenario_id"):
@@ -97,6 +110,26 @@ def iter_pairs(cfg: InvestigatorRunConfig, scenarios: dict[str, dict], skip: set
             progress(f"[skip] {sid}: " + ("scenario not found" if scenario is None else "no successful replay"))
             continue
         yield scenario, replay
+        emitted += 1
+        if cfg.limit is not None and emitted >= cfg.limit:
+            return
+
+
+def _pairs_without_output(cfg: InvestigatorRunConfig, scenarios: dict[str, dict],
+                          skip: set[str]) -> Iterator[tuple[dict, dict]]:
+    """Every scenario with a prompt for ``cfg.run_mode``, with no victim answer."""
+    if cfg.run_mode not in GOLD_LABEL:
+        raise ValueError("no_output needs run_mode 'attacks' or 'safe'")
+    emitted = 0
+    for scenario in select_scenarios(scenarios.values(), cfg.run_mode):
+        sid = scenario_id(scenario)
+        if sid in skip:
+            continue
+        yield scenario, {
+            "scenario_id": sid, "domain": scenario.get("domain", ""),
+            "attack_type": scenario.get("attack_type", ""), "run_mode": cfg.run_mode,
+            "source_file": "", "target_model": "", "replay_idx": "", "text": NO_OUTPUT_TEXT,
+        }
         emitted += 1
         if cfg.limit is not None and emitted >= cfg.limit:
             return
@@ -141,7 +174,9 @@ def run_investigator(cfg: InvestigatorRunConfig, progress: Callable[[str], None]
     scenarios = {scenario_id(s): s for s in load_scenarios(root)}
     skip = _done_scenarios(cfg.output_csv) if cfg.resume else set()
     pairs = iter_pairs(cfg, scenarios, skip, progress)
-    progress(f"judge={cfg.judge_model} guided_json={cfg.guided_json} "
+    if not cfg.no_output and not cfg.replays:
+        raise ValueError("a replay file is needed unless no_output is set")
+    progress(f"judge={cfg.judge_model} guided_json={cfg.guided_json} no_output={cfg.no_output} "
              f"{len(scenarios)} scenarios indexed, {len(skip)} already done")
 
     written, started = 0, time.time()

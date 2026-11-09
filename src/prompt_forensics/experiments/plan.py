@@ -194,3 +194,82 @@ def write_whitespace_roots(scenarios: Sequence[dict[str, Any]], sample: Sequence
         write_scenarios(items, root, overwrite=overwrite)
         roots.append(root)
     return roots
+
+
+# ---- Sensitivity runs (temperature, Investigator without the response) -------------
+#
+# Two small experiments that change one factor at a time:
+#
+# * temperature: the same prompts replayed at several temperatures, all other
+#   settings and the seeds unchanged, plus a second pass at the thesis
+#   temperature with the same seeds, to measure how often a replay with the
+#   same seed gives back exactly the same text;
+# * Investigator ablation: the same judge, prompt and settings as the main
+#   runs, with the victim's answer left out, to measure what the answer adds
+#   to the detection of attacks.
+#
+# The ablation sample is a stratified sample of prompts (same strata as the
+# deep pools); the temperature sample is a stratified part of it, so that the
+# two analyses share prompts.
+
+SENSITIVITY_FIELDS = ["scenario_id", "run_mode", "temperature_sample",
+                      "attack_type", "domain", "split", "safe_kind"]
+
+
+def sensitivity_plan(scenarios: Sequence[dict[str, Any]], ablation: int = 2_000,
+                     temperature: int = 1_000, seed: int = 2027) -> list[dict[str, Any]]:
+    """One row per prompt of the ablation sample; ``temperature_sample`` marks the nested part."""
+    if temperature > ablation:
+        raise ValueError("the temperature sample is drawn from the ablation sample: temperature <= ablation")
+    rows = [r for r in plan_runs(scenarios, deep=ablation, shards=1, seed=seed) if r["pool"] == "deep"]
+    strata: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        strata[(row["run_mode"], str(row["attack_type"]), str(row["domain"]),
+                str(row["split"]), str(row["safe_kind"] or ""))].append(row)
+    # Proportional allocation, largest remainder. Strata of the ablation
+    # sample are small, so many remainders tie (0.5 when halving): ties are
+    # broken at random, not by stratum name, which would favour one run mode.
+    rng = random.Random(seed + 1)
+    exact = {k: temperature * len(v) / len(rows) for k, v in strata.items()}
+    alloc = {k: int(v) for k, v in exact.items()}
+    tiebreak = {k: rng.random() for k in sorted(strata)}
+    for k in sorted(exact, key=lambda k: (-(exact[k] - alloc[k]), tiebreak[k]))[:temperature - sum(alloc.values())]:
+        alloc[k] += 1
+    chosen: set[tuple[str, str]] = set()
+    for key in sorted(strata):
+        members = sorted(strata[key], key=lambda r: r["scenario_id"])
+        for row in rng.sample(members, alloc[key]):
+            chosen.add((row["scenario_id"], row["run_mode"]))
+    return [{
+        "scenario_id": r["scenario_id"], "run_mode": r["run_mode"],
+        "temperature_sample": (r["scenario_id"], r["run_mode"]) in chosen,
+        "attack_type": r["attack_type"], "domain": r["domain"], "split": r["split"],
+        "safe_kind": r["safe_kind"],
+    } for r in rows]
+
+
+def write_sensitivity_plan(scenarios: Sequence[dict[str, Any]], rows: Sequence[dict[str, Any]],
+                           out_dir: str | Path, overwrite: bool = False) -> list[Path]:
+    """Write ``plan.csv`` and the scenario roots ``ablation_<mode>`` and ``temperature_<mode>``."""
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    with (out / "plan.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=SENSITIVITY_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    by_id = {scenario_id(s): s for s in scenarios}
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        scenario = dict(by_id[row["scenario_id"]])
+        scenario.pop("source_file", None)
+        other = "safe" if row["run_mode"] == "attacks" else "attacks"
+        scenario[PROMPT_KEY[other]] = None  # only the prompt of this run mode
+        groups[f"ablation_{row['run_mode']}"].append(scenario)
+        if row["temperature_sample"]:
+            groups[f"temperature_{row['run_mode']}"].append(scenario)
+    roots = []
+    for name, items in sorted(groups.items()):
+        root = out / name
+        write_scenarios(items, root, overwrite=overwrite)
+        roots.append(root)
+    return roots
