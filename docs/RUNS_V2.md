@@ -112,3 +112,30 @@ tail -f results/v2/sensitivity/steps.log
 Results go to `results/v2/sensitivity/` (copied to `sensitivity/` on the
 Hub every 30 minutes) and `results/v2/sensitivity.tar.gz`; the tables come
 from `scripts/analysis_v2/sensitivity.py`.
+
+## Archiving the results
+
+The Hub repository is an archive of the result files, not an evidence store:
+its files are not chained, signed or anchored. Before the archived version of
+the thesis is deposited (the repository must be public by then), write a
+SHA-256 manifest pinned to one commit of the repository and publish it with
+the archive:
+
+```bash
+export HF_TOKEN=hf_...   # read access while the repository is private
+python scripts/archive_manifest.py --repo Latavious/prompt-forensics-runs-v2 \
+    --revision main --out archive/MANIFEST
+```
+
+This writes `archive/MANIFEST.sha256` (the `sha256sum` format) and
+`archive/MANIFEST.json` (repository, resolved commit, date, size and hash of
+each file). Files stored with LFS or Xet are not downloaded, since the Hub
+gives their SHA-256; the small git files are downloaded one at a time (about
+3 minutes and 0.5 GB for the 885 files of the version 2 runs). Cite the
+commit recorded in `MANIFEST.json` as the revision of the dataset.
+
+A reader checks a download of the same revision with
+`sha256sum -c MANIFEST.sha256`, or with
+`python scripts/archive_manifest.py --out archive/MANIFEST --check <folder>`.
+The check shows that the files have not changed since the manifest was
+written, not since they were generated.
