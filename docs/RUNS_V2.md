@@ -122,6 +122,7 @@ SHA-256 manifest pinned to one commit of the repository and publish it with
 the archive:
 
 ```bash
+pip install huggingface_hub
 export HF_TOKEN=hf_...   # read access while the repository is private
 python scripts/archive_manifest.py --repo Latavious/prompt-forensics-runs-v2 \
     --revision main --out archive/MANIFEST
@@ -137,5 +138,8 @@ commit recorded in `MANIFEST.json` as the revision of the dataset.
 A reader checks a download of the same revision with
 `sha256sum -c MANIFEST.sha256`, or with
 `python scripts/archive_manifest.py --out archive/MANIFEST --check <folder>`.
-The check shows that the files have not changed since the manifest was
-written, not since they were generated.
+The script's check also reports files that are not in the manifest, which
+`sha256sum -c` does not. Either check shows that the files have not changed
+since the manifest was written, not since they were generated. The hashes of
+the LFS and Xet files are those recorded by the Hub; checking a download
+compares them with the actual bytes.

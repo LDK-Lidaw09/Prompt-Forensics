@@ -29,7 +29,10 @@ writes two files:
 example a downloaded snapshot), and ``--check DIR`` verifies a folder
 against an existing ``MANIFEST.sha256`` without needing ``sha256sum``.
 
-The token (``HF_TOKEN``) needs read access while the repository is private.
+The Hub mode needs ``huggingface_hub`` (``pip install huggingface_hub``,
+already used by ``backup_to_hf.py``). The token (``HF_TOKEN``) needs read
+access while the repository is private. A ``--local`` folder must not change
+while it is hashed.
 """
 
 from __future__ import annotations
@@ -56,8 +59,11 @@ def sha256_file(path: str | Path) -> str:
 
 def hub_entries(repo: str, revision: str) -> tuple[str, list[dict]]:
     """Return the resolved commit and one entry per file of the repository."""
-    from huggingface_hub import HfApi, hf_hub_download
-    from huggingface_hub.hf_api import RepoFile
+    try:
+        from huggingface_hub import HfApi, hf_hub_download
+        from huggingface_hub.hf_api import RepoFile
+    except ImportError:
+        sys.exit("huggingface_hub is required for the Hub mode: pip install huggingface_hub")
 
     api = HfApi()
     commit = api.dataset_info(repo, revision=revision).sha
@@ -82,18 +88,32 @@ def hub_entries(repo: str, revision: str) -> tuple[str, list[dict]]:
     return commit, entries
 
 
-def local_entries(folder: Path) -> list[dict]:
-    entries = []
+def list_files(folder: Path, skip: set[Path] = frozenset()) -> list[tuple[str, Path]]:
+    """Relative POSIX path and absolute path of every file under ``folder``."""
+    if not folder.is_dir():
+        sys.exit(f"not a folder: {folder}")
+    found = []
     for path in sorted(p for p in folder.rglob("*") if p.is_file()):
         rel = path.relative_to(folder).as_posix()
-        if rel.startswith(".cache/") or rel.startswith(".git/"):
+        if rel.startswith((".cache/", ".git/")) or path.resolve() in skip:
             continue
+        found.append((rel, path))
+    return found
+
+
+def local_entries(folder: Path, skip: set[Path]) -> list[dict]:
+    entries = []
+    for rel, path in list_files(folder, skip):
         entries.append({"path": rel, "size": path.stat().st_size,
                         "sha256": sha256_file(path), "source": "local"})
     return entries
 
 
 def write_manifest(out: Path, meta: dict, entries: list[dict]) -> None:
+    for e in entries:
+        # The sha256sum format has one name per line; such names would need escaping.
+        if "\n" in e["path"] or "\\" in e["path"]:
+            sys.exit(f"unsupported file name (newline or backslash): {e['path']!r}")
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out.with_suffix(".sha256"), "w", encoding="utf-8", newline="\n") as handle:
         for e in entries:
@@ -106,11 +126,13 @@ def write_manifest(out: Path, meta: dict, entries: list[dict]) -> None:
           f"{out.with_suffix('.json')}")
 
 
-def check(manifest: Path, folder: Path) -> int:
+def check(manifest: Path, folder: Path, skip: set[Path]) -> int:
     bad = missing = 0
     lines = manifest.read_text(encoding="utf-8").splitlines()
+    listed = set()
     for line in lines:
         digest, rel = line.split("  ", 1)
+        listed.add(rel)
         path = folder / rel
         if not path.is_file():
             print(f"MISSING  {rel}")
@@ -118,8 +140,11 @@ def check(manifest: Path, folder: Path) -> int:
         elif sha256_file(path) != digest:
             print(f"CHANGED  {rel}")
             bad += 1
-    print(f"{len(lines)} files checked: {bad} changed, {missing} missing")
-    return 0 if bad == missing == 0 else 1
+    extra = [rel for rel, _ in list_files(folder, skip) if rel not in listed]
+    for rel in extra:
+        print(f"EXTRA    {rel}")
+    print(f"{len(lines)} files checked: {bad} changed, {missing} missing, {len(extra)} not in the manifest")
+    return 0 if bad == missing == len(extra) == 0 else 1
 
 
 def main() -> int:
@@ -134,13 +159,15 @@ def main() -> int:
                         help="verify DIR against <out>.sha256 instead of writing a manifest")
     args = parser.parse_args()
 
+    # The manifest files themselves are never part of what they describe.
+    skip = {args.out.with_suffix(ext).resolve() for ext in (".sha256", ".json")}
     if args.check:
-        return check(args.out.with_suffix(".sha256"), args.check)
+        return check(args.out.with_suffix(".sha256"), args.check, skip)
 
     created = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     if args.local:
         meta = {"source": "local", "folder": str(args.local), "created_utc": created}
-        entries = local_entries(args.local)
+        entries = local_entries(args.local, skip)
     else:
         commit, entries = hub_entries(args.repo, args.revision)
         meta = {"source": "huggingface", "repo": args.repo, "repo_type": "dataset",
