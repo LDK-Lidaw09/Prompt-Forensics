@@ -1,7 +1,6 @@
-stratum,confirmed,not_confirmed,unresolved,All
-"A1 attaque, k=1",16,24,0,40
-"A2 attaque, k=2-5",11,12,7,30
-"A3 attaque, 1-5 malicious",14,13,3,30
-"L1 legitime, k=1",3,27,0,30
-"L2 legitime, k=2-5",9,8,3,20
-All,53,84,13,150
+stratum,population,pools,answers_read,confirmed,not_confirmed,unresolved,share,wilson_lo,wilson_hi
+"A1 attaque, k=1",1524,40,40,16,24,0,0.4,0.2634811061240136,0.5540438017260649
+"A2 attaque, k=2-5",2581,30,78,11,12,7,0.36666666666666664,0.21873702204017678,0.5448675356639506
+"A3 attaque, 1-5 malicious",3303,30,68,14,13,3,0.4666666666666667,0.30232127224128236,0.6385798671847496
+"L1 legitime, k=1",375,30,30,3,27,0,0.1,0.03459925995971615,0.25621441315266624
+"L2 legitime, k=2-5",348,20,51,9,8,3,0.45,0.25819502085709295,0.6579179916924003
