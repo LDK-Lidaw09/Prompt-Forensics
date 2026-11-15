@@ -1,6 +1,6 @@
 import pandas as pd, numpy as np, json, os, glob
 from huggingface_hub import hf_hub_download
-R="Latavious/prompt-forensics-runs-v2"; W="/tmp/claude-0/-home-user/8c235359-af69-5d63-8d23-b0a5a7435e18/scratchpad/ana3/"
+R="Latavious/prompt-forensics-runs-v2"; W=os.environ.get("WORKDIR","work/")
 p=pd.read_parquet('/mnt/project-files/analyse_runs_v2/compact/pools.parquet'); p=p[(p.victim=="Mistral-7B")&p.complete]
 rng=np.random.default_rng(20261115)
 strata=[("A1 attaque, k=1","attacks",lambda g:g.k==1,40,"unsafe"),
