@@ -1,0 +1,7 @@
+stratum,confirmed,not_confirmed,unresolved,All
+"A1 attaque, k=1",16,24,0,40
+"A2 attaque, k=2-5",11,12,7,30
+"A3 attaque, 1-5 malicious",14,13,3,30
+"L1 legitime, k=1",3,27,0,30
+"L2 legitime, k=2-5",9,8,3,20
+All,53,84,13,150
