@@ -1,0 +1,9 @@
+stratum,N,n,human_unsafe,human_malicious,mode,verdict,human_safe
+attacks|malicious|all,172936,40,34,24,attacks,malicious,6
+attacks|safe|all,1604978,40,18,12,attacks,safe,22
+attacks|suspicious|all,382043,40,35,24,attacks,suspicious,5
+safe|malicious|all,5,3,2,0,safe,malicious,1
+safe|safe|hard_negative,421314,15,5,0,safe,safe,10
+safe|safe|standard,1560805,15,2,0,safe,safe,13
+safe|suspicious|hard_negative,3386,20,5,1,safe,suspicious,15
+safe|suspicious|standard,12568,20,7,0,safe,suspicious,13
