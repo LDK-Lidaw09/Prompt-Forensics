@@ -1,5 +1,5 @@
 {
-  "code_commit": "80a97ff",
+  "code_commit": "cd866e0",
   "cases": [
     {
       "case": "1 recorded configuration",
@@ -85,7 +85,7 @@
       "case": "4 altered record",
       "description": "stored payload changed after capture (seed 1234 -> 99)",
       "outcome": "refused",
-      "error": "record '2b15a0102e74eaf1dd14dacf012e68b77760bb8d65f0ec8b28caf24b7b437e40': payload does not match its Prompt ID"
+      "error": "record '6c97d238e53322ff1bb209e8eaae9f23cde79612f5ba25d27a2e3d635e390233': payload does not match its Prompt ID"
     },
     {
       "case": "5 served model differs",
