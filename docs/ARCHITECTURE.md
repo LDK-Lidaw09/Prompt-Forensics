@@ -90,6 +90,24 @@ BERTScore F1, plus the population standard deviation and the number of
 pairs/replays at or above the 0.9 threshold. Missing replays keep their
 index and are reported; Fidelity is undefined without r₁.
 
+A replay of a stored interaction (`pipeline.replay_interaction`, Replay tab
+of the demo) reads the model and the parameters `temperature`, `max_tokens`
+and `seed` from the source's signed canonical payload, not from the current
+settings. A value given by the caller overrides the recorded one. Each replay
+record stores, in `metadata.replay_config`, the recorded configuration, the
+configuration used, the list of differences (field, recorded value, used
+value, origin: `override`, `not_recorded`, `not_sent` or `served` when the
+server reports another model than the one recorded), `faithful` (no
+difference) and the elements a replay depends on but the record does not hold
+(chat template, server defaults, serving version, hardware), which are
+therefore not checked.
+`served` also covers a server that declares another model than the one requested
+(`served_model`). A replay of a record whose stored payload no longer matches
+its Prompt ID is refused. `scripts/replay_config_check.py` runs the five cases
+offline (recorded configuration, explicit change, parameters absent from the
+record, altered record, other served model) and writes
+`results/replay_check/replay_config_check.json`.
+
 ## Judges
 
 | Agent | Input | Output | Used for |

@@ -17,3 +17,146 @@ def test_capture_and_replay_with_the_simulator(no_ml):
     # The second turn of the session sees the first one.
     second = capture_interaction("And times 3?", run_self_audit=False, session_id="s1")
     assert second["history_used"] and second["context_hash"]
+
+
+def test_replay_reuses_the_recorded_configuration(monkeypatch):
+    from prompt_forensics import config
+    captured = capture_interaction("What is 2+2?", run_self_audit=False,
+                                   temperature=0.7, max_tokens=64, seed=42)
+    # The settings change after the capture: the replay must still use what was recorded.
+    monkeypatch.setenv("LIVE_TEMPERATURE", "0.1")
+    monkeypatch.setenv("LIVE_MAX_TOKENS", "999")
+    config.get_settings.cache_clear()
+
+    from prompt_forensics import pipeline
+    sent = {}
+    real_call = pipeline.call_llm
+
+    def spy(prompt, model, params):
+        sent.update(model=model, params=dict(params))
+        return real_call(prompt, model, params)
+    monkeypatch.setattr(pipeline, "call_llm", spy)
+
+    replayed = replay_interaction(captured["prompt_id"])
+    assert sent == {"model": "sim:victim", "params": {"temperature": 0.7, "max_tokens": 64, "seed": 42}}
+    assert replayed["params"] == {"temperature": 0.7, "max_tokens": 64, "seed": 42}
+    assert replayed["replay_config"]["faithful"] is True
+    assert replayed["replay_config"]["divergences"] == []
+    assert replayed["replay_config"]["not_recorded"]          # stated, never silently assumed
+    assert replayed["content_hash"] == replayed["source_content_hash"]
+
+    stored = get_store().get_interaction(replayed["prompt_id"])
+    import json
+    meta = json.loads(stored["metadata_json"])
+    assert meta["source_prompt_id"] == captured["prompt_id"]
+    assert meta["replay_config"]["recorded"]["params"] == {"temperature": 0.7, "max_tokens": 64, "seed": 42}
+
+
+def test_replay_reports_every_divergence():
+    captured = capture_interaction("What is 2+2?", run_self_audit=False,
+                                   temperature=0.7, max_tokens=64, seed=42)
+    replayed = replay_interaction(captured["prompt_id"], seed=43, model="sim:other")
+    config = replayed["replay_config"]
+    assert config["faithful"] is False
+    fields = {d["field"]: d for d in config["divergences"]}
+    assert fields["seed"] == {"field": "seed", "recorded": 42, "used": 43, "origin": "override"}
+    assert fields["model"]["recorded"] == "sim:victim" and fields["model"]["origin"] == "override"
+    assert fields["model_used"] == {"field": "model_used", "recorded": "victim", "used": "other", "origin": "served"}
+    assert "temperature" not in fields and "max_tokens" not in fields
+    assert replayed["content_hash"] != replayed["source_content_hash"]
+
+
+def test_replay_of_a_record_without_parameters_says_so(store):
+    from prompt_forensics.canonical import build_interaction_payload
+    payload = build_interaction_payload(prompt="Hello", model="sim:victim", params={},
+                                        timestamp="2026-01-01T00:00:00Z", user_id="u")
+    stored = store.append_interaction(payload=payload, response_text="Hi", record_type="live")
+    replayed = replay_interaction(stored.prompt_id, store=store)
+    origins = {d["field"]: d["origin"] for d in replayed["replay_config"]["divergences"]}
+    assert origins == {"temperature": "not_recorded", "max_tokens": "not_recorded", "seed": "not_recorded"}
+
+
+def test_replay_refuses_a_payload_changed_after_capture(store):
+    import sqlite3
+
+    import pytest
+
+    from prompt_forensics.canonical import build_interaction_payload
+    payload = build_interaction_payload(prompt="Hello", model="sim:victim", params={"seed": 1},
+                                        timestamp="2026-01-01T00:00:00Z", user_id="u")
+    stored = store.append_interaction(payload=payload, response_text="Hi", record_type="live")
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("DROP TRIGGER IF EXISTS interactions_no_update")
+        conn.execute("UPDATE interactions SET canonical_payload = replace(canonical_payload, '\"seed\":1', '\"seed\":2')")
+    with pytest.raises(ValueError, match="does not match"):
+        replay_interaction(stored.prompt_id, store=store)
+
+
+def test_parameters_the_provider_ignores_are_reported_as_not_sent():
+    from prompt_forensics.llm import sent_param_keys
+    from prompt_forensics.pipeline import compare_configuration
+    recorded = {"model": "anthropic:m", "model_used": None, "system": None,
+                "params": {"temperature": 0.2, "max_tokens": 512, "seed": 7}}
+    params = dict(recorded["params"])
+    config = compare_configuration(recorded, "anthropic:m", params, {}, sent_keys=sent_param_keys("anthropic:m"))
+    assert config["faithful"] is False
+    assert config["divergences"] == [{"field": "seed", "recorded": 7, "used": None, "origin": "not_sent"}]
+
+
+def test_replay_sends_the_recorded_system_message(store, monkeypatch):
+    from prompt_forensics import pipeline
+    from prompt_forensics.canonical import build_interaction_payload
+    payload = build_interaction_payload(prompt="Hello", model="sim:victim", params={"seed": 1},
+                                        timestamp="2026-01-01T00:00:00Z", user_id="u", system="Be brief.")
+    stored = store.append_interaction(payload=payload, response_text="Hi", record_type="live")
+    sent = {}
+    real_call = pipeline.call_llm
+
+    def spy(prompt, model, params):
+        sent.update(params)
+        return real_call(prompt, model, params)
+    monkeypatch.setattr(pipeline, "call_llm", spy)
+    replayed = replay_interaction(stored.prompt_id, store=store)
+    assert sent["system"] == "Be brief."
+    assert "system" not in {d["field"] for d in replayed["replay_config"]["divergences"]}
+
+
+def test_a_value_given_for_a_missing_parameter_is_an_override(store):
+    from prompt_forensics.canonical import build_interaction_payload
+    payload = build_interaction_payload(prompt="Hello", model="sim:victim", params={},
+                                        timestamp="2026-01-01T00:00:00Z", user_id="u")
+    stored = store.append_interaction(payload=payload, response_text="Hi", record_type="live")
+    replayed = replay_interaction(stored.prompt_id, store=store, seed=5)
+    origins = {d["field"]: d["origin"] for d in replayed["replay_config"]["divergences"]}
+    assert origins["seed"] == "override" and origins["temperature"] == "not_recorded"
+
+
+def test_a_served_model_other_than_the_requested_one_is_reported(monkeypatch):
+    from prompt_forensics import pipeline
+    from prompt_forensics.llm import LLMResponse
+    captured = capture_interaction("Hello", run_self_audit=False, seed=1)
+    real_call = pipeline.call_llm
+
+    def other_version(prompt, model, params):
+        r = real_call(prompt, model, params)
+        return LLMResponse(text=r.text, model="victim-v0.3", provider=r.provider, timing_ms=0)
+    monkeypatch.setattr(pipeline, "call_llm", other_version)
+    fields = {d["field"]: d for d in replay_interaction(captured["prompt_id"])["replay_config"]["divergences"]}
+    assert fields["served_model"] == {"field": "served_model", "recorded": "victim", "used": "victim-v0.3",
+                                      "origin": "served"}
+
+
+def test_the_replay_check_script_covers_the_five_cases(tmp_path):
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[1] / "scripts" / "replay_config_check.py"
+    out = tmp_path / "check.json"
+    subprocess.run([sys.executable, str(script), str(out)], check=True, capture_output=True)
+    cases = json.loads(out.read_text())["cases"]
+    assert [c["outcome"] for c in cases] == ["replayed", "replayed", "replayed", "refused", "replayed"]
+    assert cases[0]["faithful"] is True
+    assert [d["origin"] for d in cases[1]["divergences"]] == ["override"]
+    assert {d["origin"] for d in cases[2]["divergences"]} == {"not_recorded"}
+    assert {d["field"] for d in cases[4]["divergences"]} == {"served_model", "model_used"}

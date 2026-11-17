@@ -1,0 +1,122 @@
+{
+  "code_commit": "cd866e0",
+  "cases": [
+    {
+      "case": "1 recorded configuration",
+      "description": "replay without any argument",
+      "outcome": "replayed",
+      "faithful": true,
+      "params_sent": {
+        "temperature": 0.2,
+        "max_tokens": 512,
+        "seed": 1234
+      },
+      "divergences": [],
+      "not_recorded": [
+        "chat template applied by the server",
+        "server defaults for sampling parameters that were not sent",
+        "serving software and its version",
+        "hardware and load of the server"
+      ]
+    },
+    {
+      "case": "2 explicit change",
+      "description": "replay with seed=1235",
+      "outcome": "replayed",
+      "faithful": false,
+      "params_sent": {
+        "temperature": 0.2,
+        "max_tokens": 512,
+        "seed": 1235
+      },
+      "divergences": [
+        {
+          "field": "seed",
+          "recorded": 1234,
+          "used": 1235,
+          "origin": "override"
+        }
+      ],
+      "not_recorded": [
+        "chat template applied by the server",
+        "server defaults for sampling parameters that were not sent",
+        "serving software and its version",
+        "hardware and load of the server"
+      ]
+    },
+    {
+      "case": "3 parameters absent from the record",
+      "description": "record with params = {}",
+      "outcome": "replayed",
+      "faithful": false,
+      "params_sent": {
+        "temperature": 0.2,
+        "max_tokens": 512,
+        "seed": 1234
+      },
+      "divergences": [
+        {
+          "field": "max_tokens",
+          "recorded": null,
+          "used": 512,
+          "origin": "not_recorded"
+        },
+        {
+          "field": "seed",
+          "recorded": null,
+          "used": 1234,
+          "origin": "not_recorded"
+        },
+        {
+          "field": "temperature",
+          "recorded": null,
+          "used": 0.2,
+          "origin": "not_recorded"
+        }
+      ],
+      "not_recorded": [
+        "chat template applied by the server",
+        "server defaults for sampling parameters that were not sent",
+        "serving software and its version",
+        "hardware and load of the server"
+      ]
+    },
+    {
+      "case": "4 altered record",
+      "description": "stored payload changed after capture (seed 1234 -> 99)",
+      "outcome": "refused",
+      "error": "record '6c97d238e53322ff1bb209e8eaae9f23cde79612f5ba25d27a2e3d635e390233': payload does not match its Prompt ID"
+    },
+    {
+      "case": "5 served model differs",
+      "description": "server declares victim-v0.3 for the requested sim:victim",
+      "outcome": "replayed",
+      "faithful": false,
+      "params_sent": {
+        "temperature": 0.2,
+        "max_tokens": 512,
+        "seed": 1234
+      },
+      "divergences": [
+        {
+          "field": "served_model",
+          "recorded": "victim",
+          "used": "victim-v0.3",
+          "origin": "served"
+        },
+        {
+          "field": "model_used",
+          "recorded": "victim",
+          "used": "victim-v0.3",
+          "origin": "served"
+        }
+      ],
+      "not_recorded": [
+        "chat template applied by the server",
+        "server defaults for sampling parameters that were not sent",
+        "serving software and its version",
+        "hardware and load of the server"
+      ]
+    }
+  ]
+}

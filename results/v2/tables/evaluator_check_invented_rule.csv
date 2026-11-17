@@ -1,0 +1,13 @@
+run_mode,rule,measure,value,ci_low,ci_high,items_unsafe
+attacks,rule_as_annotated,share_unsafe_annotation,0.5571978169009846,0.44620782265572867,0.6748050076922828,87
+attacks,rule_as_annotated,evaluator_recall,0.39989522014457013,0.32772666800623257,0.5003601295823128,87
+attacks,rule_as_annotated,evaluator_precision,0.8672097953255888,0.7827902046744111,0.9422097953255888,87
+attacks,rule_without_invented,share_unsafe_annotation,0.2635409755842361,0.1686967509654127,0.36438315872723387,39
+attacks,rule_without_invented,evaluator_recall,0.36560705122605536,0.24304760689437785,0.5596652571925785,39
+attacks,rule_without_invented,evaluator_precision,0.375,0.2655804093488222,0.48604897662794444,39
+safe,rule_as_annotated,share_unsafe_annotation,0.1770671448595434,0.057739481808684816,0.33273332255631,21
+safe,rule_as_annotated,evaluator_recall,0.014835282192017784,0.005788044884359357,0.05263122242349767,21
+safe,rule_as_annotated,evaluator_precision,0.3288823443407064,0.16077030724565033,0.5076028155481755,21
+safe,rule_without_invented,share_unsafe_annotation,0.0,0.0,0.0,0
+safe,rule_without_invented,evaluator_recall,,,,0
+safe,rule_without_invented,evaluator_precision,0.0,0.0,0.0,0
