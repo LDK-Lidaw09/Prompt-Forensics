@@ -65,7 +65,9 @@ from prompt_forensics.experiments.replays import ReplayConfig, run_replays  # no
 from prompt_forensics.llm import LLMError, list_models  # noqa: E402
 from prompt_forensics.metrics.robustness import compute_replay_robustness  # noqa: E402
 from prompt_forensics.pii import detect_sensitive, has_sensitive  # noqa: E402
-from prompt_forensics.pipeline import capture_interaction, get_store, replay_interaction  # noqa: E402
+from prompt_forensics.pipeline import (  # noqa: E402
+    capture_interaction, get_store, recorded_configuration, replay_interaction,
+)
 from prompt_forensics.scenarios import RUN_MODES  # noqa: E402
 from prompt_forensics.signing import public_key_path  # noqa: E402
 from tamper_experiment import (  # noqa: E402
@@ -340,6 +342,14 @@ def tab_replay(opts: dict[str, Any]) -> None:
     with st.expander("Stored prompt and answer"):
         st.code(source["prompt_text"], language="text")
         st.write(source["response_text"])
+    recorded = recorded_configuration(source)
+    st.caption(f"Recorded configuration: model `{recorded['model']}`, parameters `{recorded['params']}`")
+    use_recorded = st.checkbox(
+        "Use the recorded configuration", True,
+        help="Off: the model and generation settings of the sidebar replace the recorded ones; "
+             "every difference is stored with the replay and shown below.")
+    opts = dict(opts, use_recorded=use_recorded,
+                recorded_seed=recorded["params"].get("seed", get_settings().seed_base))
 
     single, pool, bulk = st.tabs(["Single replay + judges", "Replay pool (robustness)", "Across models"])
     with single:
@@ -350,17 +360,40 @@ def tab_replay(opts: dict[str, Any]) -> None:
         replay_across_models(source_id, opts)
 
 
+def replay_kwargs(opts: dict[str, Any], seed_offset: int = 0, model: str | None = None) -> dict[str, Any]:
+    """Arguments of replay_interaction: None keeps the recorded value."""
+    if opts.get("use_recorded", True):
+        return {"model": model, "seed": None if not seed_offset else _recorded_seed(opts) + seed_offset,
+                "temperature": None, "max_tokens": None}
+    return {"model": model or opts["model"], "seed": opts["seed"] + seed_offset,
+            "temperature": opts["temperature"], "max_tokens": opts["max_tokens"]}
+
+
+def _recorded_seed(opts: dict[str, Any]) -> int:
+    return int(opts.get("recorded_seed", get_settings().seed_base))
+
+
+def show_replay_config(config: dict[str, Any]) -> None:
+    """State whether the replay used the recorded configuration, and every difference."""
+    if config["faithful"]:
+        st.success("Replay run with the recorded model and parameters.")
+    else:
+        st.warning("The replay differs from the recorded configuration:")
+        st.table(config["divergences"])
+    st.caption("Not recorded, hence not checked: " + "; ".join(config["not_recorded"]) + ".")
+
+
 def replay_single(source_id: str, opts: dict[str, Any]) -> None:
     """Replay once, show the diff and run the baseline-vs-replay judges."""
     judge = st.checkbox("Run the similarity and safety judges", True)
     if st.button("Replay once"):
         with st.spinner("Replaying…"):
             try:
-                out = replay_interaction(source_id, model=opts["model"], seed=opts["seed"],
-                                         temperature=opts["temperature"], max_tokens=opts["max_tokens"])
+                out = replay_interaction(source_id, **replay_kwargs(opts))
             except LLMError as exc:
                 st.error(str(exc))
                 return
+        show_replay_config(out["replay_config"])
         st.write(out["response"])
         same = out["content_hash"] == out["source_content_hash"]
         st.caption(f"Stored as `{out['prompt_id']}` · same content hash as the source: {same} "
@@ -383,16 +416,15 @@ def replay_single(source_id: str, opts: dict[str, Any]) -> None:
 def replay_pool(source_id: str, opts: dict[str, Any]) -> None:
     """Replay n times with seeds seed, seed+1, ... and compute Consistency and Fidelity."""
     n = st.slider("Replays in the pool", 2, 20, 10)
-    st.caption(f"Seeds {opts['seed']} … {opts['seed'] + n - 1}. Replay 1 is the Fidelity reference "
+    base = _recorded_seed(opts) if opts.get("use_recorded", True) else opts["seed"]
+    st.caption(f"Seeds {base} … {base + n - 1}. Replay 1 is the Fidelity reference "
                "(thesis 5.2). The stored original answer is not part of the pool.")
     if st.button("Run replay pool"):
         outputs: list[str | None] = []
         bar = st.progress(0.0)
         for i in range(n):
             try:
-                outputs.append(replay_interaction(
-                    source_id, model=opts["model"], seed=opts["seed"] + i,
-                    temperature=opts["temperature"], max_tokens=opts["max_tokens"])["response"])
+                outputs.append(replay_interaction(source_id, **replay_kwargs(opts, seed_offset=i))["response"])
             except LLMError as exc:
                 st.warning(f"Replay {i + 1} failed: {exc}")
                 outputs.append(None)  # kept as missing, never scored as 0
@@ -424,8 +456,7 @@ def replay_across_models(source_id: str, opts: dict[str, Any]) -> None:
         rows = []
         for model in models:
             try:
-                out = replay_interaction(source_id, model=model, seed=opts["seed"],
-                                         temperature=opts["temperature"], max_tokens=opts["max_tokens"])
+                out = replay_interaction(source_id, **replay_kwargs(opts, model=model))
                 rows.append({"model": model, "prompt_id": out["prompt_id"], "error": "",
                              "char_similarity": difflib.SequenceMatcher(
                                  None, out["baseline"], out["response"]).ratio(),

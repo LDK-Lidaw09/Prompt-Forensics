@@ -1,0 +1,5 @@
+mode,anycut,size,mean
+attacks,False,257,0.4785992217898833
+attacks,True,265,0.6830188679245283
+safe,False,256,0.02734375
+safe,True,222,0.036036036036036036

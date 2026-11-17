@@ -12,7 +12,10 @@ the demo UI or the HTTP API:
 5. append both turns to the session transcript.
 
 :func:`replay_interaction` sends a stored prompt again and stores the answer
-as a ``replay`` record linked to its source.
+as a ``replay`` record linked to its source. By default it reuses the model and
+the generation parameters recorded in the source's canonical payload, and it
+stores, with the replay, the recorded configuration, the configuration used and
+every difference between them (see :func:`compare_configuration`).
 
 The payload's ``prompt`` field is the exact text sent to the model (history
 included), so the stored evidence matches what the model actually saw.
@@ -20,6 +23,7 @@ included), so the stored evidence matches what the model actually saw.
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from typing import Any
 
@@ -138,6 +142,78 @@ def capture_interaction(
     return result
 
 
+#: Generation parameters that a replay takes from the recorded payload.
+REPLAY_PARAMS = ("temperature", "max_tokens", "seed")
+
+#: What a replay also depends on but the record of the prototype does not hold.
+#: They are listed in every replay so that the report states what was not checked.
+NOT_RECORDED = (
+    "chat template applied by the server",
+    "server defaults for sampling parameters that were not sent",
+    "serving software and its version",
+    "hardware and load of the server",
+)
+
+
+def recorded_configuration(source: dict[str, Any]) -> dict[str, Any]:
+    """Model and generation parameters recorded in a stored interaction.
+
+    They are read from the signed canonical payload, not from the settings, so
+    that a replay starts from what was used at capture time.
+    """
+    try:
+        payload = json.loads(source.get("canonical_payload") or "{}")
+    except (TypeError, ValueError):
+        payload = {}
+    params = payload.get("params") if isinstance(payload.get("params"), dict) else {}
+    return {
+        "model": payload.get("model") or source.get("model_requested"),
+        "model_used": source.get("model_used"),
+        "system": payload.get("system"),
+        "params": dict(params),
+    }
+
+
+def compare_configuration(
+    recorded: dict[str, Any],
+    used_model: str,
+    used_params: dict[str, Any],
+    overrides: dict[str, Any],
+    served_model: str | None = None,
+) -> dict[str, Any]:
+    """Compare the configuration of a replay with the recorded one.
+
+    Each difference is listed with its origin: ``override`` when the caller
+    asked for another value, ``not_recorded`` when the record holds no value
+    and a default was used, ``served`` when the server reports another model
+    than the one recorded. ``faithful`` is true only when no difference exists.
+    """
+    divergences: list[dict[str, Any]] = []
+    if recorded.get("model") is None:
+        divergences.append({"field": "model", "recorded": None, "used": used_model, "origin": "not_recorded"})
+    elif used_model != recorded["model"]:
+        divergences.append({"field": "model", "recorded": recorded["model"], "used": used_model, "origin": "override"})
+    if served_model and recorded.get("model_used") and served_model != recorded["model_used"]:
+        divergences.append({"field": "model_used", "recorded": recorded["model_used"], "used": served_model,
+                            "origin": "served"})
+    rec_params = recorded.get("params") or {}
+    for key in sorted(set(rec_params) | set(used_params)):
+        if key not in rec_params:
+            divergences.append({"field": key, "recorded": None, "used": used_params.get(key), "origin": "not_recorded"})
+        elif key not in used_params:
+            divergences.append({"field": key, "recorded": rec_params[key], "used": None, "origin": "not_sent"})
+        elif used_params[key] != rec_params[key]:
+            origin = "override" if overrides.get(key) is not None else "not_recorded"
+            divergences.append({"field": key, "recorded": rec_params[key], "used": used_params[key], "origin": origin})
+    return {
+        "recorded": recorded,
+        "used": {"model": used_model, "model_used": served_model, "params": dict(used_params)},
+        "divergences": divergences,
+        "faithful": not divergences,
+        "not_recorded": list(NOT_RECORDED),
+    }
+
+
 def replay_interaction(
     source_prompt_id: str,
     *,
@@ -150,10 +226,15 @@ def replay_interaction(
     """Send a stored prompt again and store the answer as a ``replay`` record.
 
     The replayed text is the stored ``prompt_text``, i.e. exactly what the
-    model saw the first time (history included). The new record points back
-    to its source through ``metadata.source_prompt_id``. Raises ``KeyError``
-    if the Prompt ID is unknown and :class:`~prompt_forensics.llm.LLMError` if
-    the model call fails.
+    model saw the first time (history included). The model and the parameters
+    ``temperature``, ``max_tokens`` and ``seed`` are taken from the recorded
+    payload of the source; an argument that is not ``None`` overrides the
+    recorded value, and a parameter absent from the record falls back to the
+    settings. The new record points back to its source through
+    ``metadata.source_prompt_id`` and holds, in ``metadata.replay_config``, the
+    recorded and used configurations and their differences, which are also
+    returned. Raises ``KeyError`` if the Prompt ID is unknown and
+    :class:`~prompt_forensics.llm.LLMError` if the model call fails.
     """
     settings = get_settings()
     store = store or get_store()
@@ -161,16 +242,27 @@ def replay_interaction(
     if source is None:
         raise KeyError(f"unknown prompt_id {source_prompt_id!r}")
 
-    model = model or source["model_requested"] or settings.live_model
-    params = {
-        "temperature": settings.live_temperature if temperature is None else temperature,
-        "max_tokens": settings.live_max_tokens if max_tokens is None else max_tokens,
-        "seed": settings.seed_base if seed is None else seed,
-    }
+    recorded = recorded_configuration(source)
+    overrides = {"temperature": temperature, "max_tokens": max_tokens, "seed": seed}
+    defaults = {"temperature": settings.live_temperature, "max_tokens": settings.live_max_tokens,
+                "seed": settings.seed_base}
+    model = model or recorded["model"] or settings.live_model
+    params: dict[str, Any] = {}
+    for key in REPLAY_PARAMS:
+        if overrides[key] is not None:
+            params[key] = overrides[key]
+        elif key in recorded["params"]:
+            params[key] = recorded["params"][key]
+        else:
+            params[key] = defaults[key]
+    for key, value in recorded["params"].items():   # other recorded parameters are sent as recorded
+        params.setdefault(key, value)
+
     response = call_llm(source["prompt_text"], model, params)
+    config = compare_configuration(recorded, model, params, overrides, served_model=response.model)
     payload = build_interaction_payload(
         prompt=source["prompt_text"], model=model, params=params, timestamp=utc_now(),
-        user_id="replay",
+        system=recorded["system"], user_id="replay",
     )
     stored = store.append_interaction(
         payload=payload,
@@ -178,7 +270,7 @@ def replay_interaction(
         record_type="replay",
         model_used=response.model,
         provider=response.provider,
-        metadata={"source_prompt_id": source_prompt_id, **response.provenance()},
+        metadata={"source_prompt_id": source_prompt_id, "replay_config": config, **response.provenance()},
     )
     return {
         "response": response.text,
@@ -189,6 +281,7 @@ def replay_interaction(
         "response_hash": stored.response_hash,
         "model": model,
         "params": params,
+        "replay_config": config,
     }
 
 

@@ -14,6 +14,9 @@ dataset `prompt-forensics-runs-v2`, about 30 GB) into the tables of
 | 6 | `inv_vs_eval.py` | `investigator_vs_evaluator.csv` |
 | 7 | `sample_and_texts.py` | stratified sample for the human validation of the Evaluator, replay texts for the whitespace baseline |
 | 8 | `whitespace.py`, `whitespace_baseline.py` | `whitespace_baseline.csv` |
+| 9 | `truncation_t02.py <sensitivity folder> results/v2/tables` | answers cut at 512 tokens and their verdicts, on the replays at temperature 0.2 of the sensitivity run: `truncation_t02_by_cut.csv`, `truncation_t02_pools.csv`, `truncation_t02_within_pools.csv` (bootstrap over pools, 10,000 resamples, seed 20261117), and `t02_replays.pkl` for step 10 |
+| 10 | `similarity_targeted_test.py t02_replays.pkl results/v2/tables/similarity_targeted_test_pairs.csv` | targeted test of the similarity scores: 30 answers changed by rule (negation, identifier, added record), a fixed refusal, and real pairs of safe and malicious answers (selection seed 7) |
+| 11 | `evaluator_check_invented_rule.py <human labels csv> results/v2/tables/evaluator_check_invented_rule.csv` | manual check of the Evaluator under two rules for invented data (stratified bootstrap, 4,000 resamples, seed 20261117) |
 
 Environment: `HF_TOKEN` (read access), `RUNS_V2_DATA` (download folder,
 default `results/v2/hf`), `RUNS_V2_WORK` (compact tables, default
