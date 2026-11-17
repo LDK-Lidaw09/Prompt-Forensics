@@ -130,3 +130,34 @@ def test_a_value_given_for_a_missing_parameter_is_an_override(store):
     replayed = replay_interaction(stored.prompt_id, store=store, seed=5)
     origins = {d["field"]: d["origin"] for d in replayed["replay_config"]["divergences"]}
     assert origins["seed"] == "override" and origins["temperature"] == "not_recorded"
+
+
+def test_a_served_model_other_than_the_requested_one_is_reported(monkeypatch):
+    from prompt_forensics import pipeline
+    from prompt_forensics.llm import LLMResponse
+    captured = capture_interaction("Hello", run_self_audit=False, seed=1)
+    real_call = pipeline.call_llm
+
+    def other_version(prompt, model, params):
+        r = real_call(prompt, model, params)
+        return LLMResponse(text=r.text, model="victim-v0.3", provider=r.provider, timing_ms=0)
+    monkeypatch.setattr(pipeline, "call_llm", other_version)
+    fields = {d["field"]: d for d in replay_interaction(captured["prompt_id"])["replay_config"]["divergences"]}
+    assert fields["served_model"] == {"field": "served_model", "recorded": "victim", "used": "victim-v0.3",
+                                      "origin": "served"}
+
+
+def test_the_replay_check_script_covers_the_five_cases(tmp_path):
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[1] / "scripts" / "replay_config_check.py"
+    out = tmp_path / "check.json"
+    subprocess.run([sys.executable, str(script), str(out)], check=True, capture_output=True)
+    cases = json.loads(out.read_text())["cases"]
+    assert [c["outcome"] for c in cases] == ["replayed", "replayed", "replayed", "refused", "replayed"]
+    assert cases[0]["faithful"] is True
+    assert [d["origin"] for d in cases[1]["divergences"]] == ["override"]
+    assert {d["origin"] for d in cases[2]["divergences"]} == {"not_recorded"}
+    assert {d["field"] for d in cases[4]["divergences"]} == {"served_model", "model_used"}

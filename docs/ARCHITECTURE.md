@@ -101,6 +101,12 @@ server reports another model than the one recorded), `faithful` (no
 difference) and the elements a replay depends on but the record does not hold
 (chat template, server defaults, serving version, hardware), which are
 therefore not checked.
+`served` also covers a server that declares another model than the one requested
+(`served_model`). A replay of a record whose stored payload no longer matches
+its Prompt ID is refused. `scripts/replay_config_check.py` runs the five cases
+offline (recorded configuration, explicit change, parameters absent from the
+record, altered record, other served model) and writes
+`results/replay_check/replay_config_check.json`.
 
 ## Judges
 

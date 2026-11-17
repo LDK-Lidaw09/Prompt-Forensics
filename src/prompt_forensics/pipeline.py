@@ -194,8 +194,9 @@ def compare_configuration(
     Each difference is listed with its origin: ``override`` when the caller
     asked for another value, ``not_recorded`` when the record holds no value
     and a default was used, ``served`` when the server reports another model
-    than the one recorded, ``not_sent`` when the provider ignores a recorded
-parameter (``sent_keys``). ``faithful`` is true only when no difference exists.
+    than the one recorded (``model_used``) or than the one requested
+    (``served_model``), ``not_sent`` when the provider ignores a recorded
+    parameter (``sent_keys``). ``faithful`` is true only when no difference exists.
     """
     divergences: list[dict[str, Any]] = []
     if recorded.get("model") is None:
@@ -203,6 +204,9 @@ parameter (``sent_keys``). ``faithful`` is true only when no difference exists.
         divergences.append({"field": "model", "recorded": None, "used": used_model, "origin": origin})
     elif used_model != recorded["model"]:
         divergences.append({"field": "model", "recorded": recorded["model"], "used": used_model, "origin": "override"})
+    if served_model and served_model != split_model_id(used_model)[1]:
+        divergences.append({"field": "served_model", "recorded": split_model_id(used_model)[1],
+                            "used": served_model, "origin": "served"})
     if served_model and recorded.get("model_used") and served_model != recorded["model_used"]:
         divergences.append({"field": "model_used", "recorded": recorded["model_used"], "used": served_model,
                             "origin": "served"})
