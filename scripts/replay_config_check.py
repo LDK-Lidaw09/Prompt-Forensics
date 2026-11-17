@@ -74,8 +74,7 @@ record("3 parameters absent from the record", "record with params = {}",
 altered = capture_interaction("Summarise the audit rules.", run_self_audit=False,
                               temperature=0.2, max_tokens=512, seed=1234)
 with sqlite3.connect(store.db_path) as conn:
-    for (trigger,) in conn.execute("SELECT name FROM sqlite_master WHERE type='trigger'").fetchall():
-        conn.execute(f"DROP TRIGGER {trigger}")
+    conn.execute("DROP TRIGGER IF EXISTS interactions_no_update")   # append-only guard of the store
     conn.execute("UPDATE interactions SET canonical_payload = replace(canonical_payload, '\"seed\":1234', "
                   "'\"seed\":99') WHERE prompt_id = ?", (altered["prompt_id"],))
 record("4 altered record", "stored payload changed after capture (seed 1234 -> 99)",

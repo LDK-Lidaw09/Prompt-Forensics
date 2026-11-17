@@ -86,8 +86,7 @@ def test_replay_refuses_a_payload_changed_after_capture(store):
                                         timestamp="2026-01-01T00:00:00Z", user_id="u")
     stored = store.append_interaction(payload=payload, response_text="Hi", record_type="live")
     with sqlite3.connect(store.db_path) as conn:
-        for (name,) in conn.execute("SELECT name FROM sqlite_master WHERE type='trigger'").fetchall():
-            conn.execute(f"DROP TRIGGER {name}")
+        conn.execute("DROP TRIGGER IF EXISTS interactions_no_update")
         conn.execute("UPDATE interactions SET canonical_payload = replace(canonical_payload, '\"seed\":1', '\"seed\":2')")
     with pytest.raises(ValueError, match="does not match"):
         replay_interaction(stored.prompt_id, store=store)
