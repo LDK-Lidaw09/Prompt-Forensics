@@ -84,6 +84,18 @@ def split_model_id(model: str) -> tuple[str, str]:
     return "vllm", model
 
 
+#: Parameter keys that each provider actually sends to the model. The
+#: simulator stands for the OpenAI-compatible servers, so it accepts their keys.
+_COMMON_KEYS = frozenset({"temperature", "max_tokens", "system"})
+_OPENAI_KEYS = _COMMON_KEYS | {"seed", "repetition_penalty", "guided_json", "guided_decoding_backend", "extra_body"}
+
+
+def sent_param_keys(model: str | None = None) -> frozenset[str]:
+    """Keys of ``params`` that :func:`call_llm` sends for ``model``; others are ignored."""
+    provider, _ = split_model_id((model or get_settings().live_model).strip())
+    return _COMMON_KEYS if provider == "anthropic" else _OPENAI_KEYS
+
+
 def call_llm(prompt: str, model: str | None = None, params: Mapping[str, Any] | None = None) -> LLMResponse:
     """Send ``prompt`` to ``model`` and return its answer.
 

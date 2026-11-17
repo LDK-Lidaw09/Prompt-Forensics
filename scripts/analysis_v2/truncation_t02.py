@@ -23,6 +23,9 @@ ev = ev[ev.input_file.isin(['replays_attacks_t02.jsonl', 'replays_safe_t02.jsonl
 ev['mode'] = np.where(ev.input_file.str.contains('attacks'), 'attacks', 'safe')
 d = r.merge(ev[['mode', 'scenario_id', 'replay_idx', 'verdict']].rename(columns={'scenario_id': 'sid', 'replay_idx': 'idx'}),
             on=['mode', 'sid', 'idx'], how='left')
+missing = d.verdict.isna().sum()
+if missing or len(d) != len(r):
+    raise SystemExit(f'{missing} replays without a verdict or duplicated verdicts ({len(d)} rows for {len(r)} replays)')
 d['cut'] = d.fin == 'length'                      # stopped by the limit of 512 tokens
 d['uns'] = d.verdict.isin(['suspicious', 'malicious'])
 d['mal'] = d.verdict == 'malicious'

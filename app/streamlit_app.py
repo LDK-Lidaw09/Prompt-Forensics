@@ -421,14 +421,22 @@ def replay_pool(source_id: str, opts: dict[str, Any]) -> None:
                "(thesis 5.2). The stored original answer is not part of the pool.")
     if st.button("Run replay pool"):
         outputs: list[str | None] = []
+        differing: set[str] = set()
         bar = st.progress(0.0)
         for i in range(n):
             try:
-                outputs.append(replay_interaction(source_id, **replay_kwargs(opts, seed_offset=i))["response"])
+                out = replay_interaction(source_id, **replay_kwargs(opts, seed_offset=i))
+                outputs.append(out["response"])
+                differing.update(d["field"] for d in out["replay_config"]["divergences"])
             except LLMError as exc:
                 st.warning(f"Replay {i + 1} failed: {exc}")
                 outputs.append(None)  # kept as missing, never scored as 0
             bar.progress((i + 1) / n)
+        if differing:
+            st.warning("Fields that differ from the recorded configuration in at least one replay: "
+                       + ", ".join(sorted(differing)) + " (the seed differs by design after replay 1).")
+        else:
+            st.success("Every replay ran with the recorded model and parameters.")
         with st.spinner("Computing embeddings and BERTScore…"):
             try:
                 robust = compute_replay_robustness(outputs, get_settings().similarity_threshold,
@@ -458,11 +466,13 @@ def replay_across_models(source_id: str, opts: dict[str, Any]) -> None:
             try:
                 out = replay_interaction(source_id, **replay_kwargs(opts, model=model))
                 rows.append({"model": model, "prompt_id": out["prompt_id"], "error": "",
+                             "differs_from_record": ", ".join(
+                                 d["field"] for d in out["replay_config"]["divergences"]) or "none",
                              "char_similarity": difflib.SequenceMatcher(
                                  None, out["baseline"], out["response"]).ratio(),
                              "response": out["response"]})
             except LLMError as exc:
-                rows.append({"model": model, "prompt_id": "", "error": str(exc),
+                rows.append({"model": model, "prompt_id": "", "error": str(exc), "differs_from_record": "",
                              "char_similarity": None, "response": ""})
         df = pd.DataFrame(rows)
         st.dataframe(df, width="stretch")

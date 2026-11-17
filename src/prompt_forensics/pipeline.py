@@ -29,7 +29,7 @@ from typing import Any
 
 from .canonical import build_interaction_payload, sha256_hex
 from .config import get_settings
-from .llm import call_llm, split_model_id
+from .llm import call_llm, sent_param_keys, split_model_id
 from .signing import load_or_create_key
 from .storage import EvidenceStore, utc_now
 from .agents.repository_investigator import investigate
@@ -159,8 +159,14 @@ def recorded_configuration(source: dict[str, Any]) -> dict[str, Any]:
     """Model and generation parameters recorded in a stored interaction.
 
     They are read from the signed canonical payload, not from the settings, so
-    that a replay starts from what was used at capture time.
+    that a replay starts from what was used at capture time. Raises
+    ``ValueError`` when the stored payload no longer matches its Prompt ID,
+    i.e. when the record was changed after capture; the chain and the
+    signatures of the whole store are checked by ``EvidenceStore.verify``.
     """
+    canonical = source.get("canonical_payload") or ""
+    if canonical and sha256_hex(canonical) != source.get("prompt_id"):
+        raise ValueError(f"record {source.get('prompt_id')!r}: payload does not match its Prompt ID")
     try:
         payload = json.loads(source.get("canonical_payload") or "{}")
     except (TypeError, ValueError):
@@ -180,13 +186,16 @@ def compare_configuration(
     used_params: dict[str, Any],
     overrides: dict[str, Any],
     served_model: str | None = None,
+    sent_keys: frozenset[str] | None = None,
+    used_system: str | None = None,
 ) -> dict[str, Any]:
     """Compare the configuration of a replay with the recorded one.
 
     Each difference is listed with its origin: ``override`` when the caller
     asked for another value, ``not_recorded`` when the record holds no value
     and a default was used, ``served`` when the server reports another model
-    than the one recorded. ``faithful`` is true only when no difference exists.
+    than the one recorded, ``not_sent`` when the provider ignores a recorded
+parameter (``sent_keys``). ``faithful`` is true only when no difference exists.
     """
     divergences: list[dict[str, Any]] = []
     if recorded.get("model") is None:
@@ -196,9 +205,16 @@ def compare_configuration(
     if served_model and recorded.get("model_used") and served_model != recorded["model_used"]:
         divergences.append({"field": "model_used", "recorded": recorded["model_used"], "used": served_model,
                             "origin": "served"})
+    if (recorded.get("system") or None) != (used_system or None):
+        divergences.append({"field": "system", "recorded": recorded.get("system"), "used": used_system,
+                            "origin": "override"})
+    elif recorded.get("system") and sent_keys is not None and "system" not in sent_keys:
+        divergences.append({"field": "system", "recorded": recorded["system"], "used": None, "origin": "not_sent"})
     rec_params = recorded.get("params") or {}
     for key in sorted(set(rec_params) | set(used_params)):
-        if key not in rec_params:
+        if key in rec_params and sent_keys is not None and key not in sent_keys:
+            divergences.append({"field": key, "recorded": rec_params[key], "used": None, "origin": "not_sent"})
+        elif key not in rec_params:
             divergences.append({"field": key, "recorded": None, "used": used_params.get(key), "origin": "not_recorded"})
         elif key not in used_params:
             divergences.append({"field": key, "recorded": rec_params[key], "used": None, "origin": "not_sent"})
@@ -207,7 +223,8 @@ def compare_configuration(
             divergences.append({"field": key, "recorded": rec_params[key], "used": used_params[key], "origin": origin})
     return {
         "recorded": recorded,
-        "used": {"model": used_model, "model_used": served_model, "params": dict(used_params)},
+        "used": {"model": used_model, "model_used": served_model, "system": used_system,
+                 "params": dict(used_params)},
         "divergences": divergences,
         "faithful": not divergences,
         "not_recorded": list(NOT_RECORDED),
@@ -258,8 +275,13 @@ def replay_interaction(
     for key, value in recorded["params"].items():   # other recorded parameters are sent as recorded
         params.setdefault(key, value)
 
-    response = call_llm(source["prompt_text"], model, params)
-    config = compare_configuration(recorded, model, params, overrides, served_model=response.model)
+    call_params = dict(params)
+    if recorded["system"] and not call_params.get("system"):
+        call_params["system"] = recorded["system"]       # the recorded system message is sent again
+    response = call_llm(source["prompt_text"], model, call_params)
+    config = compare_configuration(recorded, model, params, overrides, served_model=response.model,
+                                   sent_keys=sent_param_keys(model),
+                                   used_system=call_params.get("system") if recorded["system"] else None)
     payload = build_interaction_payload(
         prompt=source["prompt_text"], model=model, params=params, timestamp=utc_now(),
         system=recorded["system"], user_id="replay",
