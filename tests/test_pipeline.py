@@ -120,3 +120,13 @@ def test_replay_sends_the_recorded_system_message(store, monkeypatch):
     replayed = replay_interaction(stored.prompt_id, store=store)
     assert sent["system"] == "Be brief."
     assert "system" not in {d["field"] for d in replayed["replay_config"]["divergences"]}
+
+
+def test_a_value_given_for_a_missing_parameter_is_an_override(store):
+    from prompt_forensics.canonical import build_interaction_payload
+    payload = build_interaction_payload(prompt="Hello", model="sim:victim", params={},
+                                        timestamp="2026-01-01T00:00:00Z", user_id="u")
+    stored = store.append_interaction(payload=payload, response_text="Hi", record_type="live")
+    replayed = replay_interaction(stored.prompt_id, store=store, seed=5)
+    origins = {d["field"]: d["origin"] for d in replayed["replay_config"]["divergences"]}
+    assert origins["seed"] == "override" and origins["temperature"] == "not_recorded"

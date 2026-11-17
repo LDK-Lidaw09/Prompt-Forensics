@@ -199,7 +199,8 @@ parameter (``sent_keys``). ``faithful`` is true only when no difference exists.
     """
     divergences: list[dict[str, Any]] = []
     if recorded.get("model") is None:
-        divergences.append({"field": "model", "recorded": None, "used": used_model, "origin": "not_recorded"})
+        origin = "override" if overrides.get("model") is not None else "not_recorded"
+        divergences.append({"field": "model", "recorded": None, "used": used_model, "origin": origin})
     elif used_model != recorded["model"]:
         divergences.append({"field": "model", "recorded": recorded["model"], "used": used_model, "origin": "override"})
     if served_model and recorded.get("model_used") and served_model != recorded["model_used"]:
@@ -215,7 +216,8 @@ parameter (``sent_keys``). ``faithful`` is true only when no difference exists.
         if key in rec_params and sent_keys is not None and key not in sent_keys:
             divergences.append({"field": key, "recorded": rec_params[key], "used": None, "origin": "not_sent"})
         elif key not in rec_params:
-            divergences.append({"field": key, "recorded": None, "used": used_params.get(key), "origin": "not_recorded"})
+            origin = "override" if overrides.get(key) is not None else "not_recorded"
+            divergences.append({"field": key, "recorded": None, "used": used_params.get(key), "origin": origin})
         elif key not in used_params:
             divergences.append({"field": key, "recorded": rec_params[key], "used": None, "origin": "not_sent"})
         elif used_params[key] != rec_params[key]:
@@ -263,6 +265,7 @@ def replay_interaction(
     overrides = {"temperature": temperature, "max_tokens": max_tokens, "seed": seed}
     defaults = {"temperature": settings.live_temperature, "max_tokens": settings.live_max_tokens,
                 "seed": settings.seed_base}
+    requested_model = model
     model = model or recorded["model"] or settings.live_model
     params: dict[str, Any] = {}
     for key in REPLAY_PARAMS:
@@ -279,7 +282,7 @@ def replay_interaction(
     if recorded["system"] and not call_params.get("system"):
         call_params["system"] = recorded["system"]       # the recorded system message is sent again
     response = call_llm(source["prompt_text"], model, call_params)
-    config = compare_configuration(recorded, model, params, overrides, served_model=response.model,
+    config = compare_configuration(recorded, model, params, {**overrides, "model": requested_model}, served_model=response.model,
                                    sent_keys=sent_param_keys(model),
                                    used_system=call_params.get("system") if recorded["system"] else None)
     payload = build_interaction_payload(
