@@ -6,6 +6,10 @@ the archived value to the number of decimals printed in the thesis and reports
 any figure that differs. No figure is recomputed from raw data: the point is to
 show that every quoted number can be traced to a committed file.
 
+The thesis itself is not in this repository, so the printed figures are written
+below by hand. When a figure changes in the thesis, its entry here must be
+updated as well; the check then confirms that the new figure matches its table.
+
 Usage:
     python scripts/check_thesis_numbers.py            # prints a report, exit 1 on mismatch
     python scripts/check_thesis_numbers.py --tables DIR
