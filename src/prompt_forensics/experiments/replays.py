@@ -257,11 +257,24 @@ def run_replays(cfg: ReplayConfig, progress: Callable[[str], None] = print) -> t
     semaphore = threading.Semaphore(max(1, cfg.max_inflight_calls))
     # The embedding and BERTScore models are shared and not thread-safe.
     metrics_lock = threading.Lock()
+    # Set when a scenario fails: queued scenarios that a worker picks up before
+    # the main thread cancels them then return at once instead of calling the
+    # model (the cancel below cannot stop a future that has already started).
+    stop = threading.Event()
 
     with JsonlWriter(cfg.output_jsonl) as jsonl, JsonlWriter(cfg.output_pairs) as pair_file, \
             CsvWriter(cfg.output_csv, CSV_FIELDS, append=cfg.resume) as table:
 
         def process(scenario: dict) -> None:
+            if stop.is_set():
+                return
+            try:
+                _process(scenario)
+            except BaseException:
+                stop.set()
+                raise
+
+        def _process(scenario: dict) -> None:
             prompt = build_victim_prompt(scenario, cfg.run_mode)
             outputs: list[str | None] = [None] * cfg.num_replays
             with ThreadPoolExecutor(max_workers=max(1, min(cfg.replay_workers, cfg.num_replays))) as pool:
