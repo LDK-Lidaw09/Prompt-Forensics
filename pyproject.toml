@@ -8,6 +8,7 @@ version = "1.0.0"
 description = "Reference implementation of PSI (Prompt Scene Investigation), the Prompt Forensics framework of the M.Sc. thesis."
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
 authors = [{ name = "Lidaw Fabrice Ledjaki" }]
 dependencies = [
     "cryptography>=42",

@@ -1,0 +1,11 @@
+{
+  "title": "Prompt Forensics: the Prompt Scene Investigation (PSI) framework",
+  "upload_type": "software",
+  "description": "Code, benchmark and analysis scripts of the M.Sc. thesis \"Prompt Forensics\": a tamper-evident evidence store for LLM interactions, replay of recorded interactions under a documented sampling configuration, an Evaluator and an Investigator based on LLM judges, and the scripts that produce the tables of the thesis.",
+  "creators": [
+    {"name": "Ledjaki, Lidaw Fabrice"}
+  ],
+  "license": "MIT",
+  "keywords": ["LLM forensics", "digital forensics", "evidence integrity", "replay", "LLM-as-a-judge", "jailbreak"],
+  "language": "eng"
+}
