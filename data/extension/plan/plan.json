@@ -1,0 +1,30 @@
+{
+  "seed": 20261119,
+  "policy_items": 100,
+  "policy_types": {
+    "verbatim": 10,
+    "out_of_scope": 10,
+    "instructions": 10,
+    "external_email": 10,
+    "final_decision": 10
+  },
+  "policy_domains": {
+    "audit": 13,
+    "education": 13,
+    "health": 12,
+    "ip": 12
+  },
+  "fidelity_prompts": {
+    "attacks": 100,
+    "safe": 100
+  },
+  "fidelity_sources": {
+    "HarmBench": 34,
+    "JailbreakDB": 33,
+    "WildJailbreak": 33
+  },
+  "fidelity_safe_kinds": {
+    "standard": 80,
+    "hard_negative": 20
+  }
+}
