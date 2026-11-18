@@ -68,7 +68,9 @@ drawing script itself was not archived, so the pairs file is the reference.
 
 ## Figures quoted in the thesis
 
-`scripts/check_thesis_numbers.py` compares the figures quoted in chapter 6
-with the tables of `results/v2/tables/`. Table 6.5 (answer lengths) and the
-failure causes of Table 6.1 come from the raw replay and Investigator files on
-the Hugging Face dataset and have no table here.
+`scripts/check_thesis_numbers.py` compares a selection of the figures quoted
+in chapter 6 with the tables of `results/v2/tables/`, and recomputes the
+quantiles of Table 6.3 from `reference_distribution_pairs.csv`. It does not
+cover Table 6.5 (answer lengths) or the failure causes of Table 6.1: these come
+from the raw replay and Investigator files on the Hugging Face dataset and have
+no table here.

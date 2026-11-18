@@ -39,3 +39,10 @@ def test_wrong_figure_is_reported():
     module.FIGURES = [good, wrong]
     oks = [ok for _, _, ok in module.check()]
     assert oks == [True, False]
+
+
+def test_reference_quantiles_match_pairs():
+    module = _load()
+    bad = [f"{where}: thesis {printed}, pairs {value:.4f}"
+           for where, printed, value, ok in module.check_reference_quantiles() if not ok]
+    assert not bad, "\n".join(bad)

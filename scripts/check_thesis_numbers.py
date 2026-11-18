@@ -177,6 +177,39 @@ FIGURES: list[Figure] = [
 ]
 
 
+# Table 6.3: quantiles of the similarity between answers to different prompts,
+# recomputed from the archived pairs (5,000 pairs per run mode and kind).
+REFERENCE_PAIRS = "reference_distribution_pairs.csv"
+TABLE_6_3 = {
+    # (run_mode, kind): {column: (5th, median, 95th, 99th) as printed}
+    ("attacks", "within_domain"): {"cosine": ("0.339", "0.499", "0.660", "0.738"),
+                                   "bert_f1": ("0.771", "0.808", "0.846", "0.866")},
+    ("attacks", "random"): {"cosine": ("0.318", "0.458", "0.601", "0.664"),
+                            "bert_f1": ("0.769", "0.806", "0.839", "0.856")},
+    ("safe", "within_domain"): {"cosine": ("0.389", "0.516", "0.648", "0.713"),
+                                "bert_f1": ("0.747", "0.809", "0.842", "0.855")},
+    ("safe", "random"): {"cosine": ("0.341", "0.464", "0.593", "0.653"),
+                         "bert_f1": ("0.750", "0.807", "0.838", "0.852")},
+}
+QUANTILES = (0.05, 0.50, 0.95, 0.99)
+
+
+def check_reference_quantiles(tables: Path = DEFAULT_TABLES) -> list[tuple[str, str, float, bool]]:
+    """Compare the quantiles printed in Table 6.3 with the archived pairs."""
+    pairs = pd.read_csv(tables / REFERENCE_PAIRS)
+    results = []
+    for (mode, kind), columns in TABLE_6_3.items():
+        group = pairs[(pairs.run_mode == mode) & (pairs.kind == kind)]
+        if len(group) != 5000:
+            raise LookupError(f"{REFERENCE_PAIRS}: {mode}/{kind} has {len(group)} pairs, expected 5000")
+        for column, printed in columns.items():
+            for q, text in zip(QUANTILES, printed):
+                value = float(group[column].quantile(q))
+                where = f"Table 6.3, {mode} {kind}, {column} quantile {q:g}"
+                results.append((where, text, value, round(value, 3) == float(text)))
+    return results
+
+
 def lookup(tables: Path, fig: Figure) -> float:
     """Return the archived value of one figure, in the unit printed in the thesis."""
     frame = pd.read_csv(tables / fig.table)
@@ -205,14 +238,18 @@ def main() -> int:
     parser.add_argument("--tables", type=Path, default=DEFAULT_TABLES)
     args = parser.parse_args()
 
-    results = check(args.tables)
+    rows = [(fig.where, fig.printed, value, ok, fig.table, "%" if fig.percent else "")
+            for fig, value, ok in check(args.tables)]
+    rows += [(where, printed, value, ok, REFERENCE_PAIRS, "")
+             for where, printed, value, ok in check_reference_quantiles(args.tables)]
     failures = 0
-    for fig, value, ok in results:
-        unit = "%" if fig.percent else ""
+    for where, printed, value, ok, table, unit in rows:
         status = "OK " if ok else "MISMATCH"
         failures += not ok
-        print(f"{status}  {fig.printed:>7}  archived {value:.4f}{unit}  {fig.where}  [{fig.table}]")
-    print(f"\n{len(results) - failures} of {len(results)} figures match their table.")
+        print(f"{status}  {printed:>7}  archived {value:.4f}{unit}  {where}  [{table}]")
+    print(f"\n{len(rows) - failures} of {len(rows)} figures match their table.")
+    print("Not covered: Table 6.5 (answer lengths) and the failure causes of Table 6.1,")
+    print("which come from the raw files of the Hugging Face dataset.")
     return 1 if failures else 0
 
 
