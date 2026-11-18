@@ -1,0 +1,7 @@
+case,expected,alteration,detected,detected_without_anchor,problems_hash,problems_chain,problems_signature,problems_anchor,first_problems,layers_reporting
+T1,"detected (response hash, chain)",interaction 512: word 52 of the answer replaced,True,True,1,0,0,0,interaction 512: response_hash does not match the response,hash
+T2,"detected (Prompt ID, chain)",interaction 226: recorded seed 1234 -> 1235,True,True,2,0,0,0,interaction 226: prompt_id does not match the payload | interaction 226: content_hash does not match the payload,hash
+T3,detected (chain),interaction 89 deleted,True,True,0,1,0,1,"interaction 90: chain broken (a row was removed or reordered) | anchor of 2026-11-18T21:20:35.744055Z: 550 records anchored, 549 left (records were removed)","chain, anchor"
+T4,detected only with the exported anchor,last 10 interactions deleted,True,False,0,0,0,1,"anchor of 2026-11-18T21:20:35.744055Z: 550 records anchored, 540 left (records were removed)",anchor
+T5,not detected,annotation 10 (interaction 59): verdict safe -> malicious,False,False,0,0,0,0,,none
+T6,detected only with the exported anchor,"interaction 166: answer forged, chain rebuilt and re-signed from there",True,False,0,0,0,1,anchor of 2026-11-18T21:20:35.744055Z: record 550 no longer has the anchored chain hash (the history was rewritten),anchor
