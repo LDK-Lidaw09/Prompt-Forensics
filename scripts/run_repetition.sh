@@ -48,7 +48,7 @@ if ! done_step install; then
     .venv-vllm/bin/pip install -q --upgrade pip
     .venv-vllm/bin/pip install -q "vllm==$VLLM_VERSION" "transformers<5" hf_transfer
     .venv/bin/pip install -q --upgrade pip
-    .venv/bin/pip install -q -e . hf_transfer
+    .venv/bin/pip install -q -e . huggingface_hub hf_transfer
     mark_done install
 fi
 # Same detokenizer patch as scripts/run_gpu_shard.sh (vLLM 0.10.1.1 crash).
