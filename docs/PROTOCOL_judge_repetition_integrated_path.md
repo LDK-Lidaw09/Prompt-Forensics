@@ -1,7 +1,7 @@
 # Protocol: judge repetition and complete path in the signed store
 
-Status: **draft for validation**. Once validated, this file is committed
-before any run and is not changed afterwards; any deviation is reported as a
+Status: **validated on 2026-11-18, frozen**. This file is committed before
+any run and is not changed afterwards; any deviation is reported as a
 deviation in the results.
 
 Both experiments use the models, prompts and settings of the main version 2
