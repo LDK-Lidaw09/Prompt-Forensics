@@ -164,3 +164,15 @@ The suite checks canonicalisation, signatures and tamper detection, the
 robustness formulas, judge-output parsing, the result tables (against
 hand-computed values) and runs the experiments and the interface end to end
 with the simulator.
+
+The figures quoted in the thesis (tail risk, stability, human checks,
+Investigator rates, whitespace control) are compared with the archived tables
+of `results/v2/tables/` by
+
+```bash
+python scripts/check_thesis_numbers.py
+```
+
+which lists each figure, the table it comes from and its archived value. The
+same check runs in the test suite and on GitHub Actions at every push
+(`.github/workflows/tests.yml`).
