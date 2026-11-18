@@ -18,6 +18,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import functools
+import hashlib
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +28,9 @@ from pathlib import Path
 import pandas as pd
 
 DEFAULT_TABLES = Path(__file__).resolve().parents[1] / "results" / "v2" / "tables"
+# Every numeric cell of the chapter 6 tables that has an archived source, with
+# the table, row and column it is read from (extracted from the manuscript).
+FIGURES_CSV = DEFAULT_TABLES.parent / "thesis_figures.csv"
 
 
 @dataclass(frozen=True)
@@ -210,9 +216,14 @@ def check_reference_quantiles(tables: Path = DEFAULT_TABLES) -> list[tuple[str, 
     return results
 
 
+@functools.lru_cache(maxsize=None)
+def _read(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path)
+
+
 def lookup(tables: Path, fig: Figure) -> float:
     """Return the archived value of one figure, in the unit printed in the thesis."""
-    frame = pd.read_csv(tables / fig.table)
+    frame = _read(tables / fig.table)
     mask = pd.Series(True, index=frame.index)
     for column, value in fig.row.items():
         mask &= frame[column].isna() if value is None else frame[column] == value
@@ -223,12 +234,41 @@ def lookup(tables: Path, fig: Figure) -> float:
     return value * 100 if fig.percent else value
 
 
+def matches(value: float, fig: Figure) -> bool:
+    """True when the printed figure is the archived value rounded to its decimals.
+
+    Half a unit of the last printed decimal is allowed either way, so that a
+    value lying exactly half-way may be rounded up or down.
+    """
+    return abs(value - fig.expected) <= 0.5 * 10 ** -fig.decimals + 1e-9
+
+
+def load_table_figures(path: Path = FIGURES_CSV) -> list[Figure]:
+    """Read the cell-by-cell figures of the chapter 6 tables (thesis_figures.csv)."""
+    frame = pd.read_csv(path, dtype=str)
+    return [Figure(f"{row.place} [{row.figure}]",
+                   row.printed + ("%" if row.kind == "pct" else ""),
+                   row.table, json.loads(row.selector), row.column)
+            for row in frame.itertuples()]
+
+
+def verify_frozen_tables(tables: Path = DEFAULT_TABLES) -> list[str]:
+    """Return the tables whose SHA-256 differs from results/v2/tables/SHA256SUMS."""
+    changed = []
+    for line in (tables / "SHA256SUMS").read_text().splitlines():
+        digest, name = line.split(maxsplit=1)
+        actual = hashlib.sha256((tables / name).read_bytes()).hexdigest()
+        if actual != digest:
+            changed.append(name)
+    return changed
+
+
 def check(tables: Path = DEFAULT_TABLES) -> list[tuple[Figure, float, bool]]:
     """Compare every figure with its table; return (figure, archived value, ok)."""
     results = []
-    for fig in FIGURES:
+    for fig in FIGURES + load_table_figures():
         value = lookup(tables, fig)
-        ok = round(value, fig.decimals) == round(fig.expected, fig.decimals)
+        ok = matches(value, fig)
         results.append((fig, value, ok))
     return results
 
@@ -238,6 +278,9 @@ def main() -> int:
     parser.add_argument("--tables", type=Path, default=DEFAULT_TABLES)
     args = parser.parse_args()
 
+    changed = verify_frozen_tables(args.tables)
+    for name in changed:
+        print(f"CHANGED  {name} differs from SHA256SUMS: the reference tables are frozen")
     rows = [(fig.where, fig.printed, value, ok, fig.table, "%" if fig.percent else "")
             for fig, value, ok in check(args.tables)]
     rows += [(where, printed, value, ok, REFERENCE_PAIRS, "")
@@ -250,7 +293,7 @@ def main() -> int:
     print(f"\n{len(rows) - failures} of {len(rows)} figures match their table.")
     print("Not covered: Table 6.5 (answer lengths) and the failure causes of Table 6.1,")
     print("which come from the raw files of the Hugging Face dataset.")
-    return 1 if failures else 0
+    return 1 if failures or changed else 0
 
 
 if __name__ == "__main__":

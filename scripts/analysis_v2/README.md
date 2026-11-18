@@ -68,9 +68,15 @@ drawing script itself was not archived, so the pairs file is the reference.
 
 ## Figures quoted in the thesis
 
-`scripts/check_thesis_numbers.py` compares a selection of the figures quoted
-in chapter 6 with the tables of `results/v2/tables/`, and recomputes the
-quantiles of Table 6.3 from `reference_distribution_pairs.csv`. It does not
-cover Table 6.5 (answer lengths) or the failure causes of Table 6.1: these come
-from the raw replay and Investigator files on the Hugging Face dataset and have
-no table here.
+The tables of `results/v2/tables/` are the frozen reference for the results of
+the thesis: `results/v2/tables/SHA256SUMS` records their SHA-256, and the
+check below fails if any of them changes. `results/v2/thesis_figures.csv`
+lists every numeric cell of the chapter 6 tables that has an archived source
+(369 figures), with the table, row selector and column it is read from.
+
+`scripts/check_thesis_numbers.py` compares these cells, a selection of figures
+quoted in the text of chapter 6 and the quantiles of Table 6.3 (recomputed from
+`reference_distribution_pairs.csv`) with the reference tables. It does not
+cover Table 6.5 (answer lengths) or the failure causes of Table 6.1, which come
+from the raw replay and Investigator files on the Hugging Face dataset, nor
+the figures of the text that come from analyses without an archived table.
