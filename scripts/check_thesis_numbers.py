@@ -34,7 +34,7 @@ class Figure:
     where: str            # place in the thesis
     printed: str          # figure as printed, e.g. "72.7%" or "0.884"
     table: str            # CSV file in results/v2/tables/
-    row: dict             # column -> value selecting exactly one row
+    row: dict             # column -> value selecting exactly one row (None = empty)
     column: str           # column holding the value
 
     @property
@@ -57,6 +57,7 @@ MISTRAL_ATT = {"victim": "Mistral-7B", "mode": "attacks", "group": "all"}
 MISTRAL_SAFE = {"victim": "Mistral-7B", "mode": "safe", "group": "all"}
 INV_ATT = {"run_mode": "attacks", "rule": "rule_without_invented"}
 ANN_ATT = {"run_mode": "attacks", "rule": "rule_as_annotated"}
+ANN_SAFE = {"run_mode": "safe", "rule": "rule_as_annotated"}
 
 FIGURES: list[Figure] = [
     # Section 6.3: tail risk of the victim model (Evaluator verdicts).
@@ -127,6 +128,52 @@ FIGURES: list[Figure] = [
            "whitespace_baseline.csv", {**ATT, "comparison": "base vs orig"}, "same_verdict"),
     Figure("6.2, same verdict, original vs perturbed whitespace (attacks)", "79.5%",
            "whitespace_baseline.csv", {**ATT, "comparison": "orig vs pert"}, "same_verdict"),
+    # Cells of chapter 6 tables checked one by one at the final reading.
+    Figure("Table 6.2, legitimate pools with BERTScore Consistency >= 0.9", "84.7%",
+           "replay_stability.csv", MISTRAL_SAFE, "cons_bert_score_frac_ge0.9"),
+    Figure("Table 6.4, legitimate pairs with cosine >= 0.85", "95.8%",
+           "tau_sweep.csv", {"victim": "Mistral-7B", "mode": "safe", "tau": 0.85}, "frac_pairs_ge"),
+    Figure("Table 6.8, JailbreakDB-style third, all families", "73.6%",
+           "tail_risk_by_source.csv", {"source": "JailbreakDB", "family": None}, "tail"),
+    Figure("Table 6.8, WildJailbreak third, upper bound", "86.0%",
+           "tail_risk_by_source.csv", {"source": "WildJailbreak", "family": None}, "hi"),
+    Figure("Table 6.9, attack precision, upper bound", "0.942",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_ATT, "measure": "evaluator_precision"}, "ci_high"),
+    Figure("Table 6.9, attack share unsafe (annotation), lower bound", "44.6%",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_ATT, "measure": "share_unsafe_annotation"}, "ci_low"),
+    Figure("Table 6.9, attack share unsafe (annotation), upper bound", "67.5%",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_ATT, "measure": "share_unsafe_annotation"}, "ci_high"),
+    Figure("Table 6.9, legitimate precision, lower bound", "0.161",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_SAFE, "measure": "evaluator_precision"}, "ci_low"),
+    Figure("Table 6.9, legitimate precision, upper bound", "0.508",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_SAFE, "measure": "evaluator_precision"}, "ci_high"),
+    Figure("Table 6.9, legitimate recall, upper bound", "0.053",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_SAFE, "measure": "evaluator_recall"}, "ci_high"),
+    Figure("Table 6.9, legitimate share unsafe (annotation)", "17.7%",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_SAFE, "measure": "share_unsafe_annotation"}, "value"),
+    Figure("Table 6.9, legitimate share unsafe (annotation), lower bound", "5.8%",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_SAFE, "measure": "share_unsafe_annotation"}, "ci_low"),
+    Figure("Table 6.9, legitimate share unsafe (annotation), upper bound", "33.3%",
+           "evaluator_check_invented_rule.csv",
+           {**ANN_SAFE, "measure": "share_unsafe_annotation"}, "ci_high"),
+    Figure("Table 6.15, legitimate prompts at T=0, lower bound", "0.4%",
+           "sensitivity_temperature.csv", {"temperature": 0.0, "run_mode": "safe"}, "any_unsafe_lo"),
+    Figure("Table 6.15, legitimate Consistency at T=1.0", "0.916",
+           "sensitivity_temperature.csv", {"temperature": 1.0, "run_mode": "safe"}, "consistency_mean"),
+    Figure("Table 6.17, same-run recall with the answer, lower bound", "97.2%",
+           "sensitivity_ablation.csv",
+           {"baseline": "same run, temperature sample", "run_mode": "attacks"}, "with_lo"),
+    Figure("Table 6.17, same-run recall with the answer, upper bound", "99.3%",
+           "sensitivity_ablation.csv",
+           {"baseline": "same run, temperature sample", "run_mode": "attacks"}, "with_hi"),
 ]
 
 
@@ -135,7 +182,7 @@ def lookup(tables: Path, fig: Figure) -> float:
     frame = pd.read_csv(tables / fig.table)
     mask = pd.Series(True, index=frame.index)
     for column, value in fig.row.items():
-        mask &= frame[column] == value
+        mask &= frame[column].isna() if value is None else frame[column] == value
     rows = frame[mask]
     if len(rows) != 1:
         raise LookupError(f"{fig.table}: {fig.row} selects {len(rows)} rows, expected 1")

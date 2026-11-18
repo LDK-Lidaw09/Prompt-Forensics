@@ -56,3 +56,19 @@ temperature sample, with it). `sensitivity.py` writes
 `sensitivity_ablation.csv`; the ablation is paired by prompt with the
 Qwen3-14B Investigator of the main runs when their CSVs are under
 `$RUNS_V2_DATA`.
+
+## Reference distribution (Table 6.3)
+
+`reference_distribution_pairs.csv` holds 5,000 pairs of first answers to
+different prompts per run mode and kind (same domain, or drawn at random),
+with their cosine and BERTScore; `reference_distribution_summary.csv` gives
+the quantiles reported in Table 6.3. The pairs were drawn from 4,000 first
+answers (500 per domain and run mode) during the chapter 6 analysis; the
+drawing script itself was not archived, so the pairs file is the reference.
+
+## Figures quoted in the thesis
+
+`scripts/check_thesis_numbers.py` compares the figures quoted in chapter 6
+with the tables of `results/v2/tables/`. Table 6.5 (answer lengths) and the
+failure causes of Table 6.1 come from the raw replay and Investigator files on
+the Hugging Face dataset and have no table here.
