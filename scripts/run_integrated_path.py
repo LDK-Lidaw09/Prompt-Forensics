@@ -17,8 +17,12 @@ Three stages, run with the right model served (see scripts/run_repetition.sh):
     5. the head of the chain is exported (``EvidenceStore.anchor``);
     6. verification with the trusted public key and the anchor
        (``scripts/verify_evidence.py`` and ``scripts/anchor_evidence.py verify``);
-    then the controlled alterations T1 to T6, each on a fresh copy of the
+    then the controlled alterations T1 to T9, each on a fresh copy of the
     store, edited directly in SQLite (the triggers are dropped first).
+    T1-T6 are those of the first run; T7 (a report changed), T8 (the judged
+    answer replaced and the interaction chain re-signed with the key) and T9
+    (a verdict changed and the annotation chain re-signed with the key) test
+    the chained annotations.
 
 The store is ``<out>/evidence.sqlite``; the signing key is created in
 ``<out>/../keys/`` (outside the database and outside the copied results; the
@@ -51,19 +55,23 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from prompt_forensics.agents.evaluator import evaluate_output  # noqa: E402
-from prompt_forensics.agents.investigator import investigate_pair  # noqa: E402
-from prompt_forensics.canonical import canonical_json, text_hash  # noqa: E402
+from prompt_forensics.agents.evaluator import build_prompt as evaluator_prompt, evaluate_output  # noqa: E402
+from prompt_forensics.agents.investigator import PROMPT_TEMPLATE, investigate_pair  # noqa: E402
+from prompt_forensics.canonical import canonical_json, sha256_hex, text_hash  # noqa: E402
 from prompt_forensics.pipeline import capture_interaction, replay_interaction  # noqa: E402
 from prompt_forensics.scenarios import build_victim_prompt, load_scenarios, scenario_id  # noqa: E402
 from prompt_forensics.signing import load_or_create_key, public_key_path  # noqa: E402
-from prompt_forensics.storage import EvidenceStore, chain_digest  # noqa: E402
+from prompt_forensics.storage import EvidenceStore, annotation_digest, chain_digest  # noqa: E402
 
 VICTIM = "mistralai/Mistral-7B-Instruct-v0.3"
 JUDGE = "Qwen/Qwen3-14B"
 SEED_BASE, REPLAYS = 1234, 10
-LAYERS = ("hash", "chain", "signature", "anchor")
+LAYERS = ("hash", "chain", "signature", "binding", "anchor")
+CASES = ("T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9")
 _lock = threading.Lock()
+# Version of the judge instructions, recorded with every annotation.
+EVALUATOR_PROMPT_SHA = sha256_hex(evaluator_prompt("{output}"))
+INVESTIGATOR_PROMPT_SHA = sha256_hex(PROMPT_TEMPLATE)
 
 
 # ----------------------------------------------------------------------------- helpers
@@ -181,7 +189,9 @@ def cmd_judge(args) -> None:
             if not verdict.ok:
                 raise RuntimeError(f"judge failed: {verdict.error}")
             store.add_annotation(iid, "evaluator", {**verdict.as_dict(), "raw_text": raw,
-                                                    "provenance": provenance}, args.judge)
+                                                    "provenance": provenance}, args.judge,
+                                 params={"temperature": 0.0, "max_tokens": 512, "seed": 777 + int(rep["replay"]),
+                                         "guided_backend": "xgrammar", "prompt_sha256": EVALUATOR_PROMPT_SHA})
         except Exception as exc:   # noqa: BLE001
             failure(p, "evaluator", f"{rep['item']}#{rep['replay']}", exc)
 
@@ -197,7 +207,10 @@ def cmd_judge(args) -> None:
                 guided_json=True, guided_backend="xgrammar", dataset_max_chars=1000)
             if not report.ok:
                 raise RuntimeError(f"judge failed: {report.error}")
-            store.add_annotation(iid, "investigator", {**report.as_dict(), "raw_text": raw}, args.judge)
+            store.add_annotation(iid, "investigator", {**report.as_dict(), "raw_text": raw}, args.judge,
+                                 params={"temperature": 0.0, "max_tokens": 640, "seed": 777,
+                                         "repetition_penalty": 1.3, "guided_backend": "xgrammar",
+                                         "dataset_max_chars": 1000, "prompt_sha256": INVESTIGATOR_PROMPT_SHA})
         except Exception as exc:   # noqa: BLE001
             failure(p, "investigator", item["item"], exc)
 
@@ -247,7 +260,7 @@ def build_reports(store: EvidenceStore, p: dict[str, Path]) -> list[dict[str, An
             "investigator_attack_succeeded": inv[-1].get("attack_succeeded") if inv else None,
         }
         if not any(a["kind"] == "report" for a in store.annotations_for(int(source["id"]))):
-            store.add_annotation(int(source["id"]), "report", report)
+            store.add_annotation(int(source["id"]), "report", report, params={"builder": "build_reports"})
         reports.append(report)
     return reports
 
@@ -257,9 +270,54 @@ def layer_of(problem: str) -> str:
         return "anchor"
     if "signature" in problem or "not signed" in problem:
         return "signature"
+    if "binding" in problem:
+        return "binding"
     if "chain" in problem:
         return "chain"
     return "hash"
+
+
+def rechain_annotations(conn: sqlite3.Connection, start_id: int, key) -> None:
+    """Rebuild the annotation chain from ``start_id`` and re-sign it with ``key``."""
+    notes = [dict(r) for r in conn.execute("SELECT * FROM annotations ORDER BY id").fetchall()]
+    start = next(i for i, r in enumerate(notes) if r["id"] == start_id)
+    prev = notes[start - 1]["chain_hash"] if start else "0" * 64
+    for r in notes[start:]:
+        r["prev_chain_hash"] = prev
+        r["chain_hash"] = annotation_digest(r)
+        r["signature"] = key.sign_digest(r["chain_hash"])
+        prev = r["chain_hash"]
+        conn.execute("UPDATE annotations SET result_json=?, result_hash=?, prev_chain_hash=?, chain_hash=?, "
+                     "signature=? WHERE id=?", (r["result_json"], r["result_hash"], r["prev_chain_hash"],
+                                                r["chain_hash"], r["signature"], r["id"]))
+
+
+def edit_annotation(conn: sqlite3.Connection, kind: str, rng: random.Random, change) -> tuple[dict, str]:
+    """Change the result of one annotation of ``kind`` and recompute its result hash."""
+    notes = conn.execute("SELECT * FROM annotations WHERE kind=? ORDER BY id", (kind,)).fetchall()
+    a = dict(rng.choice(notes))
+    result = json.loads(a["result_json"])
+    what = change(result)
+    a["result_json"] = json.dumps(result, ensure_ascii=False, sort_keys=True)
+    a["result_hash"] = sha256_hex(a["result_json"])
+    conn.execute("UPDATE annotations SET result_json=?, result_hash=? WHERE id=?",
+                 (a["result_json"], a["result_hash"], a["id"]))
+    return a, what
+
+
+def flip_verdict(result: dict) -> str:
+    old = result["verdict"]
+    result["verdict"] = "safe" if old != "safe" else "malicious"
+    result["unsafe"] = result["verdict"] != "safe"
+    result["malicious"] = result["verdict"] == "malicious"
+    return f"verdict {old} -> {result['verdict']}"
+
+
+def flip_report(result: dict) -> str:
+    old = result.get("investigator_decision")
+    result["investigator_decision"] = "safe" if old == "attack" else "attack"
+    result["unsafe_answers"] = 0
+    return f"report: decision {old} -> {result['investigator_decision']}, unsafe answers -> 0"
 
 
 def drop_triggers(conn: sqlite3.Connection) -> None:
@@ -297,18 +355,37 @@ def alter(case: str, db: Path, key_path: Path, rng: random.Random) -> str:
         conn.execute("DELETE FROM interactions WHERE id > ?", (n - k,))
         what = f"last {k} interactions deleted"
     elif case == "T5":   # one Evaluator verdict, with its own hash recomputed
-        ann = conn.execute("SELECT * FROM annotations WHERE kind='evaluator' ORDER BY id").fetchall()
-        a = dict(rng.choice(ann))
-        result = json.loads(a["result_json"])
-        old = result["verdict"]
-        result["verdict"] = "safe" if old != "safe" else "malicious"
-        result["unsafe"] = result["verdict"] != "safe"
-        result["malicious"] = result["verdict"] == "malicious"
-        result_json = json.dumps(result, ensure_ascii=False, sort_keys=True)
-        from prompt_forensics.canonical import sha256_hex
-        conn.execute("UPDATE annotations SET result_json=?, result_hash=? WHERE id=?",
-                     (result_json, sha256_hex(result_json), a["id"]))
-        what = f"annotation {a['id']} (interaction {a['interaction_id']}): verdict {old} -> {result['verdict']}"
+        a, change = edit_annotation(conn, "evaluator", rng, flip_verdict)
+        what = f"annotation {a['id']} (interaction {a['interaction_id']}): {change}"
+    elif case == "T7":   # one report, with its own hash recomputed
+        a, change = edit_annotation(conn, "report", rng, flip_report)
+        what = f"annotation {a['id']} (interaction {a['interaction_id']}): {change}"
+    elif case == "T8":   # the judged answer replaced, interaction chain rebuilt and re-signed with the key
+        key = load_or_create_key(key_path)
+        judged = {r[0] for r in conn.execute("SELECT interaction_id FROM annotations WHERE kind='evaluator'")}
+        target = rng.choice([r for r in middle if r["id"] in judged])
+        rows = [dict(r) for r in conn.execute("SELECT * FROM interactions ORDER BY id").fetchall()]
+        start = next(i for i, r in enumerate(rows) if r["id"] == target["id"])
+        rows[start]["response_text"] = "I cannot help with that request."
+        rows[start]["response_hash"] = text_hash(rows[start]["response_text"])
+        prev = rows[start - 1]["chain_hash"]
+        for r in rows[start:]:
+            r["prev_chain_hash"] = prev
+            r["chain_hash"] = chain_digest(r)
+            r["signature"] = key.sign_digest(r["chain_hash"])
+            prev = r["chain_hash"]
+            conn.execute("UPDATE interactions SET response_text=?, response_hash=?, prev_chain_hash=?, "
+                         "chain_hash=?, signature=? WHERE id=?",
+                         (r["response_text"], r["response_hash"], r["prev_chain_hash"], r["chain_hash"],
+                          r["signature"], r["id"]))
+        what = (f"interaction {target['id']}: judged answer replaced, interaction chain rebuilt and re-signed "
+                "with the key, annotations left as they were")
+    elif case == "T9":   # one verdict changed, annotation chain rebuilt and re-signed with the key
+        key = load_or_create_key(key_path)
+        a, change = edit_annotation(conn, "evaluator", rng, flip_verdict)
+        rechain_annotations(conn, a["id"], key)
+        what = (f"annotation {a['id']} (interaction {a['interaction_id']}): {change}, annotation chain rebuilt "
+                "and re-signed with the key")
     elif case == "T6":   # forged answer, chain rebuilt and re-signed with the stolen key
         key = load_or_create_key(key_path)
         rows = [dict(r) for r in conn.execute("SELECT * FROM interactions ORDER BY id").fetchall()]
@@ -390,7 +467,7 @@ def cmd_finish(args) -> None:
     results = []
     copies = out / "altered"
     copies.mkdir(exist_ok=True)
-    for case in ("T1", "T2", "T3", "T4", "T5", "T6"):
+    for case in CASES:
         copy = copies / f"{case}.sqlite"
         shutil.copy(p["db"], copy)
         what = alter(case, copy, p["key"], rng)

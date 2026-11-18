@@ -118,11 +118,11 @@ def test_integrated_path_end_to_end(tmp_path, monkeypatch):
     assert set(config.field) == {"seed"} and set(config.origin) == {"override"}
     assert config.replays.sum() == 27                      # replay 0 uses the recorded seed 1234
     alt = pd.read_csv(out / "alterations.csv").set_index("case")
-    for case in ("T1", "T2", "T3"):
-        assert alt.loc[case, "detected"] and alt.loc[case, "detected_without_anchor"]
-    for case in ("T4", "T6"):
-        assert alt.loc[case, "detected"] and not alt.loc[case, "detected_without_anchor"]
-    assert not alt.loc["T5", "detected"]
+    assert alt.detected.drop("T9").all() and alt.loc["T9", "detected"]
+    for case in ("T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"):
+        assert alt.loc[case, "detected_without_anchor"], case
+    assert not alt.loc["T9", "detected_without_anchor"]        # re-signed with the key: anchor only
+    assert alt.loc["T5", "problems_chain"] > 0 and alt.loc["T8", "problems_binding"] > 0
     table = _load("integrated_path_tables", ROOT / "scripts" / "analysis_v2" / "integrated_path.py")
     monkeypatch.setattr(sys, "argv", ["integrated_path.py", "--run", str(out), "--out", str(tmp_path / "t")])
     table.main()

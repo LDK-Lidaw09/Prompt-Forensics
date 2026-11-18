@@ -28,6 +28,7 @@ from pathlib import Path
 
 import pandas as pd
 
+# First run (docs/PROTOCOL_judge_repetition_integrated_path.md): annotations outside the chain.
 EXPECTED = {
     "T1": "detected (response hash, chain)",
     "T2": "detected (Prompt ID, chain)",
@@ -36,7 +37,19 @@ EXPECTED = {
     "T5": "not detected",
     "T6": "detected only with the exported anchor",
 }
-LAYERS = ("hash", "chain", "signature", "anchor")
+# Second run (docs/PROTOCOL_policies_verdict_chain_fidelity.md): chained and signed annotations.
+EXPECTED_CHAINED = {
+    "T1": "detected (response hash)",
+    "T2": "detected (Prompt ID, content hash)",
+    "T3": "detected (chain, binding, anchor)",
+    "T4": "detected (binding, anchor)",
+    "T5": "detected (annotation chain)",
+    "T6": "detected (binding, anchor)",
+    "T7": "detected (annotation chain)",
+    "T8": "detected (binding, anchor)",
+    "T9": "detected only with the exported anchor",
+}
+LAYERS = ("hash", "chain", "signature", "binding", "anchor")
 
 
 def main() -> None:
@@ -77,8 +90,9 @@ def main() -> None:
     config.to_csv(out / "integrated_path_replay_config.csv", index=False)
 
     alt = pd.read_csv(run / "alterations.csv")
-    alt.insert(1, "expected", alt.case.map(EXPECTED))
-    alt["layers_reporting"] = [", ".join(layer for layer in LAYERS if r[f"problems_{layer}"] > 0) or "none"
+    expected = EXPECTED_CHAINED if "T7" in set(alt.case) else EXPECTED
+    alt.insert(1, "expected", alt.case.map(expected))
+    alt["layers_reporting"] = [", ".join(layer for layer in LAYERS if r.get(f"problems_{layer}", 0) > 0) or "none"
                                for _, r in alt.iterrows()]
     alt.to_csv(out / "integrated_path_alterations.csv", index=False)
 

@@ -43,7 +43,7 @@ def timestamp(path: Path, tsa_url: str) -> Path:
 
 
 def cmd_create(args) -> None:
-    anchor = EvidenceStore(args.db).anchor()
+    anchor = EvidenceStore(args.db, read_only=True).anchor()
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"anchor_{anchor['created_at'].replace(':', '').replace('.', '_')}.json"
@@ -56,7 +56,7 @@ def cmd_create(args) -> None:
 def cmd_verify(args) -> None:
     anchors = [json.loads(Path(p).read_text()) for p in args.anchors]
     trusted = Path(args.public_key).read_text() if args.public_key else None
-    report = EvidenceStore(args.db).verify(trusted, anchors)
+    report = EvidenceStore(args.db, read_only=True).verify(trusted, anchors)
     problems = list(report.problems)
     for p in args.anchors:
         tsr = Path(p).with_suffix(".tsr")

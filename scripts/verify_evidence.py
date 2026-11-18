@@ -26,8 +26,9 @@ def main() -> None:
     if not Path(args.db).exists():
         sys.exit(f"{args.db} does not exist")
     trusted = Path(args.public_key).read_text() if args.public_key else None
-    report = EvidenceStore(args.db).verify(trusted)
-    print(f"{report.checked} interactions checked, {len(report.problems)} problem(s)")
+    report = EvidenceStore(args.db, read_only=True).verify(trusted)
+    print(f"{report.checked} interactions and {report.annotations_checked} annotations checked "
+          f"({report.unchained_annotations} without chain fields), {len(report.problems)} problem(s)")
     for problem in report.problems:
         print(f"  - {problem}")
     sys.exit(0 if report.ok else 1)
