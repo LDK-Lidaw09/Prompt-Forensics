@@ -167,7 +167,7 @@ def fidelity(plan: Path, run: Path, out: Path) -> None:
                         f"fidelity_replay0_{m}": grp[f"f_rep0_{m}"].mean(),
                         f"difference_{m}": diff.mean(), f"difference_{m}_ci_low": lo, f"difference_{m}_ci_high": hi,
                         f"pearson_{m}": grp[f"f_rec_{m}"].corr(grp[f"f_rep0_{m}"]),
-                        f"spearman_{m}": grp[f"f_rec_{m}"].corr(grp[f"f_rep0_{m}"], method="spearman")})
+                        f"spearman_{m}": grp[f"f_rec_{m}"].rank().corr(grp[f"f_rep0_{m}"].rank())})
         row["replay0_identical_to_recorded"] = grp.identical_replay0.mean()
         row["any_replay_identical_to_recorded"] = grp.identical_any.mean()
         rows.append(row)
