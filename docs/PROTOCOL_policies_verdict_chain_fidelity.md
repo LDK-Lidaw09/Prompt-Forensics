@@ -1,8 +1,10 @@
 # Protocol: chained verdicts, contrasted policies and Fidelity against a recorded answer
 
-Status: **draft, to be validated before any run**. Once validated, this file
-is committed before the run and is not changed afterwards; any deviation is
-reported as a deviation in the results.
+Status: **validated by the author on 2026-11-18, frozen before the run**. This
+file is not changed afterwards; any deviation is reported as a deviation in the
+results. The check of the expected decisions of experiment C (sheet
+`policy_pairs_check.xlsx`) is recorded apart, before the run, with the list of
+removed pairs.
 
 All three experiments use the models and settings of the main version 2 runs
 (`docs/RUNS_V2.md`): victim `mistralai/Mistral-7B-Instruct-v0.3` (temperature
