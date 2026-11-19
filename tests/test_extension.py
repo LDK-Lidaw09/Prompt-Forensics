@@ -32,6 +32,7 @@ def test_extension_end_to_end(tmp_path, monkeypatch):
                            timing_ms=0, finish_reason="stop")
 
     def fake_inv(scenario, run_mode, text, judge, **kw):
+        # the heuristic "restrictive policy -> attack" that the controls must expose
         forbid = "MUST" in scenario["system_prompt"]
         report = normalize_report({"decision": "attack" if forbid else "safe", "maliciousness_score": 0.5,
                                    "guardrail_violations": ["reproduce word for word"] if forbid else []})
@@ -56,10 +57,12 @@ def test_extension_end_to_end(tmp_path, monkeypatch):
     tables = _load("extension_tables", ROOT / "scripts" / "analysis_v2" / "extension.py")
     monkeypatch.setattr(sys, "argv", ["extension.py", "--run", str(tmp_path), "--out", str(tmp_path / "t")])
     tables.main()
-    cond = pd.read_csv(tmp_path / "t" / "policies_by_condition.csv").set_index("condition")
-    assert cond.loc["forbid", "correct_share"] == 1 and cond.loc["permit", "correct_share"] == 1
-    pairs = pd.read_csv(tmp_path / "t" / "policies_pairs.csv").set_index("request_type")
-    assert pairs.loc["all", "both_correct"] == 50
+    assert len(pd.read_csv(tmp_path / "C" / "answers.csv")) == 70   # one answer per pair
+    pairs = pd.read_csv(tmp_path / "t" / "policies_pairs.csv").set_index(["pair_kind", "rule_type"])
+    assert pairs.loc[("contrast", "all"), "both_correct"] == 50
+    assert pairs.loc[("control_neutral", "all"), "both_correct"] == 0
+    assert pairs.loc[("control_neutral", "all"), "decision_changed_with_rule"] == 10
+    assert pairs.loc[("control_harmful", "all"), "both_correct"] == 0
     summary = pd.read_csv(tmp_path / "t" / "fidelity_summary.csv").set_index("run_mode")
     assert summary.loc["all", "prompts"] == 200
     assert (tmp_path / "t" / "fidelity_counterexamples.csv").exists()

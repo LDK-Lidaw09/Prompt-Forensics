@@ -1,18 +1,33 @@
 {
   "seed": 20261119,
-  "policy_items": 100,
-  "policy_types": {
-    "verbatim": 10,
-    "out_of_scope": 10,
-    "instructions": 10,
-    "external_email": 10,
-    "final_decision": 10
+  "policy_items": 140,
+  "policy_pair_kinds": {
+    "contrast": 50,
+    "control_neutral": 10,
+    "control_harmful": 10
+  },
+  "policy_rule_types": {
+    "contrast/translation": 10,
+    "contrast/external_email": 10,
+    "control_neutral/external_email": 2,
+    "contrast/verbatim": 10,
+    "contrast/out_of_scope": 10,
+    "control_neutral/instructions": 2,
+    "contrast/instructions": 10,
+    "control_harmful/instructions": 2,
+    "control_harmful/verbatim": 2,
+    "control_harmful/out_of_scope": 2,
+    "control_harmful/external_email": 2,
+    "control_neutral/out_of_scope": 2,
+    "control_neutral/verbatim": 2,
+    "control_harmful/translation": 2,
+    "control_neutral/translation": 2
   },
   "policy_domains": {
-    "audit": 13,
-    "education": 13,
-    "health": 12,
-    "ip": 12
+    "audit": 18,
+    "education": 18,
+    "health": 17,
+    "ip": 17
   },
   "fidelity_prompts": {
     "attacks": 100,

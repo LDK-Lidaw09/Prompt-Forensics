@@ -4,11 +4,15 @@
 C, contrasted policies (``data/extension/plan/policy_pairs.csv``):
 
 ``policies-victim`` (victim served)
-    one answer of the victim per item (seed 1234, temperature 0.2, 512 tokens),
-    with the role, the rule, the document and the request in one user message,
-    as in the main runs;
+    one answer of the victim per pair (seed 1234, temperature 0.2, 512 tokens),
+    with the role only (no rule), the document and the request in one user
+    message, as in the main runs; the same answer is given to the judge under
+    both policies, so that only the rule changes within a pair;
 ``policies-judge`` (judge served)
-    the Investigator Qwen3-14B on each item, with the settings of the main runs.
+    the Investigator Qwen3-14B on each item, with the settings of the main runs,
+    in an order shuffled with a fixed seed, one independent call per item. The
+    judge sees the system prompt, the document, the request and the answer,
+    never the condition, the pair or the reference label.
 
 D, Fidelity against an answer recorded apart (``fidelity_sample.csv``):
 
@@ -54,6 +58,7 @@ VICTIM = "mistralai/Mistral-7B-Instruct-v0.3"
 JUDGE = "Qwen/Qwen3-14B"
 VICTIM_PARAMS = {"temperature": 0.2, "max_tokens": 512}
 SEED_BASE, FIDELITY_REPLAYS = 1234, 20
+JUDGE_ORDER_SEED = 7   # order of the Investigator calls of experiment C
 SUBSTITUTION_SEED = 7
 _lock = threading.Lock()
 
@@ -108,34 +113,37 @@ def policy_items(args) -> tuple[list[dict[str, str]], dict[str, dict]]:
 
 def cmd_policies_victim(args) -> None:
     out = Path(args.out) / "C"
-    rows, scenarios = policy_items(args)
-    done = {r["item"] for r in read_csv(out / "answers.csv")}
+    rows, _ = policy_items(args)
+    pairs = {r["pair"]: r for r in rows if r["condition"] == "permit"}
+    done = {r["pair"] for r in read_csv(out / "answers.csv")}
 
     def run(row: dict[str, str]) -> None:
-        if row["item"] in done:
+        if row["pair"] in done:
             return
+        scenario = {"id": row["pair"], "domain": row["domain"], "system_prompt": row["role_prompt"],
+                    "dataset": row["dataset"], "safe_prompt": row["request"]}
         try:
-            answer = victim(build_victim_prompt(scenarios[row["item"]], "safe"), args.victim, SEED_BASE)
-            append_csv(out / "answers.csv", {"item": row["item"], "seed": SEED_BASE, **answer, "created_at": now()})
+            answer = victim(build_victim_prompt(scenario, "safe"), args.victim, SEED_BASE)
+            append_csv(out / "answers.csv", {"pair": row["pair"], "seed": SEED_BASE, **answer, "created_at": now()})
         except Exception as exc:   # noqa: BLE001 - every failure is recorded with its cause
-            failure(out, "policies-victim", row["item"], exc)
+            failure(out, "policies-victim", row["pair"], exc)
 
-    pool(args.workers, run, rows)
-    print(f"answers: {len(read_csv(out / 'answers.csv'))} of {len(rows)}")
+    pool(args.workers, run, list(pairs.values()))
+    print(f"answers: {len(read_csv(out / 'answers.csv'))} of {len(pairs)}")
 
 
 def cmd_policies_judge(args) -> None:
     out = Path(args.out) / "C"
     rows, scenarios = policy_items(args)
-    answers = {r["item"]: r for r in read_csv(out / "answers.csv")}
+    answers = {r["pair"]: r for r in read_csv(out / "answers.csv")}
     done = {r["item"] for r in read_csv(out / "investigator.csv")}
 
     def run(row: dict[str, str]) -> None:
-        if row["item"] in done or row["item"] not in answers:
+        if row["item"] in done or row["pair"] not in answers:
             return
         try:
             report, raw, timing = investigate_pair(
-                scenarios[row["item"]], "safe", answers[row["item"]]["text"], args.judge,
+                scenarios[row["item"]], "safe", answers[row["pair"]]["text"], args.judge,
                 params={"temperature": 0.0, "max_tokens": 640, "seed": 777, "repetition_penalty": 1.3},
                 guided_json=True, guided_backend="xgrammar", dataset_max_chars=1000)
             d = report.as_dict()
@@ -150,7 +158,9 @@ def cmd_policies_judge(args) -> None:
         except Exception as exc:   # noqa: BLE001
             failure(out, "policies-judge", row["item"], exc)
 
-    pool(args.workers, run, rows)
+    order = list(rows)
+    random.Random(JUDGE_ORDER_SEED).shuffle(order)
+    pool(args.workers, run, order)
     print(f"reports: {len(read_csv(out / 'investigator.csv'))} of {len(rows)}")
 
 

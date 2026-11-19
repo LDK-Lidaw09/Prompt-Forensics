@@ -3,8 +3,8 @@
 #
 # Experiment B2, complete path with chained and signed annotations: the 50
 # prompts of the first complete path, alterations T1 to T9.
-# Experiment C, contrasted policies: 50 requests under two policies (100
-# items), one answer of the victim each, then the Investigator Qwen3-14B.
+# Experiment C, contrasted policies: 70 requests under two policies (140
+# items), one answer of the victim per pair, then the Investigator Qwen3-14B.
 # Experiment D, Fidelity against an answer recorded apart: 200 prompts, the
 # recorded answer in a first vLLM process, 20 replays in a second one, the
 # Evaluator on all of them, then cosine and BERTScore.
