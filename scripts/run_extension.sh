@@ -25,6 +25,7 @@ KEY=results/v2/extension_keys/signing_key.pem   # outside $OUT: never packed nor
 VLLM_VERSION=${VLLM_VERSION:-0.10.1.1}
 export LIVE_API_BASE=http://127.0.0.1:8000/v1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export EMBED_DEVICE=${EMBED_DEVICE:-cuda} EMBED_BATCH_SIZE=${EMBED_BATCH_SIZE:-16}   # similarity scores on the GPU
 mkdir -p "$OUT/B2" "$OUT/C" "$OUT/D"
 
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$OUT/steps.log"; }
