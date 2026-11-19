@@ -1,0 +1,30 @@
+{
+  "prompts": 50,
+  "captured": 50,
+  "replays": 500,
+  "records": {
+    "replay": 500,
+    "live": 50
+  },
+  "annotations": {
+    "evaluator": 500,
+    "investigator": 50,
+    "report": 50
+  },
+  "failures": {},
+  "reports": 50,
+  "anchor": {
+    "records": 550,
+    "chain_hash": "c38b040abb2175c3bb76349ce61a6f0eb46d67412715e54e1079c5aac470aef6",
+    "created_at": "2026-11-18T21:20:35.744055Z"
+  },
+  "replays_with_divergence": 450,
+  "replays_unlinked": 0
+}
+verification: 550 records, 0 problem(s)
+T1: detected=True (without anchor: True) hash=1 chain=0 signature=0 anchor=0
+T2: detected=True (without anchor: True) hash=2 chain=0 signature=0 anchor=0
+T3: detected=True (without anchor: True) hash=0 chain=1 signature=0 anchor=1
+T4: detected=True (without anchor: False) hash=0 chain=0 signature=0 anchor=1
+T5: detected=False (without anchor: False) hash=0 chain=0 signature=0 anchor=0
+T6: detected=True (without anchor: False) hash=0 chain=0 signature=0 anchor=1

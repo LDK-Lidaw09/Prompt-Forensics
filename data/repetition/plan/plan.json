@@ -1,0 +1,33 @@
+{
+  "seed": 20261118,
+  "evaluator": {
+    "E1": 193,
+    "E2": 300,
+    "E3": 200,
+    "E4": 200,
+    "E5": 300,
+    "E6": 300
+  },
+  "investigator": {
+    "I1": 200,
+    "I2": 5,
+    "I3": 86,
+    "I4": 200,
+    "I5": 200
+  },
+  "integrated_path": {
+    "attack HarmBench": 9,
+    "attack JailbreakDB": 8,
+    "attack WildJailbreak": 8,
+    "legitimate standard": 20,
+    "legitimate hard_negative": 5
+  },
+  "candidates": {
+    "complete_pools": {
+      "attacks": 21569,
+      "safe": 19973
+    },
+    "investigator_false_negatives": 451,
+    "investigator_false_positives": 5
+  }
+}

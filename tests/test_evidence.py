@@ -114,3 +114,55 @@ def test_history_rewritten_with_the_key_is_caught_by_an_anchor(tmp_path):
         add(forged, text)
     assert forged.verify(key.public_key_pem).ok
     assert not forged.verify(key.public_key_pem, anchors=[anchor]).ok
+
+
+def _edit(db, sql, *args):
+    conn = sqlite3.connect(db)
+    for (name,) in conn.execute("SELECT name FROM sqlite_master WHERE type='trigger'").fetchall():
+        conn.execute(f"DROP TRIGGER {name}")
+    conn.execute(sql, args)
+    conn.commit()
+    conn.close()
+
+
+def test_annotations_are_chained_signed_and_bound(tmp_path):
+    key = generate_key()
+    store = EvidenceStore(tmp_path / "e.sqlite", key)
+    first = add(store, "one")
+    a1 = store.add_annotation(first.id, "evaluator", {"verdict": "safe"}, "judge", params={"seed": 777})
+    a2 = store.add_annotation(first.id, "evaluator", {"verdict": "safe"}, "judge", params={"seed": 777})
+    notes = store.annotations_for(first.id)
+    assert notes[1]["prev_chain_hash"] == notes[0]["chain_hash"] and notes[0]["target_chain_hash"] == first.chain_hash
+    anchor = store.anchor()
+    assert anchor["annotations"] == 2
+    assert store.verify(key.public_key_pem, [anchor]).ok
+    # a verdict changed with its own hash recomputed breaks the annotation chain
+    import hashlib, json
+    forged = json.dumps({"verdict": "malicious"}, sort_keys=True)
+    _edit(store.db_path, "UPDATE annotations SET result_json=?, result_hash=? WHERE id=?",
+          forged, hashlib.sha256(forged.encode()).hexdigest(), a2)
+    assert any("annotation" in p and "chain_hash" in p for p in store.verify(key.public_key_pem).problems)
+    assert a1 < a2
+
+
+def test_annotation_binding_detects_a_changed_answer(tmp_path):
+    store = EvidenceStore(tmp_path / "e.sqlite", generate_key())
+    first = add(store, "one")
+    store.add_annotation(first.id, "evaluator", {"verdict": "safe"})
+    _edit(store.db_path, "UPDATE interactions SET response_hash=? WHERE id=?", "0" * 64, first.id)
+    assert any("binding broken" in p for p in store.verify().problems)
+
+
+def test_old_store_without_annotation_chain_opens(tmp_path):
+    db = tmp_path / "old.sqlite"
+    conn = sqlite3.connect(db)
+    conn.executescript("""CREATE TABLE annotations (id INTEGER PRIMARY KEY AUTOINCREMENT, interaction_id INTEGER
+        NOT NULL, created_at TEXT NOT NULL, kind TEXT NOT NULL, model TEXT, result_json TEXT NOT NULL,
+        result_hash TEXT NOT NULL);
+        INSERT INTO annotations (interaction_id, created_at, kind, result_json, result_hash) VALUES
+        (1, 't', 'evaluator', '{}', '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a');""")
+    conn.close()
+    store = EvidenceStore(db, generate_key())        # adds the chain columns
+    add(store, "one")
+    report = store.verify()
+    assert report.ok and report.annotations_checked == 1 and report.unchained_annotations == 1

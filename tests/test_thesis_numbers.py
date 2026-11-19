@@ -18,9 +18,9 @@ def _load():
 def test_thesis_figures_match_tables():
     module = _load()
     mismatches = []
-    for fig in module.FIGURES:
+    for fig in module.FIGURES + module.load_table_figures():
         value = module.lookup(module.DEFAULT_TABLES, fig)
-        if round(value, fig.decimals) != round(fig.expected, fig.decimals):
+        if abs(value - fig.expected) > 0.5 * 10 ** -fig.decimals + 1e-9:
             mismatches.append(f"{fig.where}: thesis {fig.printed}, table {value:.4f}")
     assert not mismatches, "\n".join(mismatches)
     assert all(ok for _, _, ok in module.check())
@@ -37,5 +37,23 @@ def test_wrong_figure_is_reported():
     good = module.FIGURES[2]  # 72.7% after 100 replays
     wrong = module.Figure(good.where, "72.8%", good.table, good.row, good.column)
     module.FIGURES = [good, wrong]
-    oks = [ok for _, _, ok in module.check()]
+    oks = [ok for fig, _, ok in module.check() if fig in (good, wrong)]
     assert oks == [True, False]
+
+
+def test_reference_quantiles_match_pairs():
+    module = _load()
+    bad = [f"{where}: thesis {printed}, pairs {value:.4f}"
+           for where, printed, value, ok in module.check_reference_quantiles() if not ok]
+    assert not bad, "\n".join(bad)
+
+
+def test_reference_tables_are_frozen():
+    module = _load()
+    assert module.verify_frozen_tables() == []
+
+
+def test_every_table_cell_selects_one_row():
+    module = _load()
+    for fig in module.load_table_figures():
+        module.lookup(module.DEFAULT_TABLES, fig)

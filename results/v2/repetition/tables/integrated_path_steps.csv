@@ -1,0 +1,9 @@
+step,expected,done
+1 capture,50,50
+2 replays,500,500
+2 replays linked to their source,500,500
+3 evaluator annotations,500,500
+3 investigator annotations,50,50
+4 reports,50,50
+5 anchor records,550,550
+6 verification problems (unaltered store),0,0
