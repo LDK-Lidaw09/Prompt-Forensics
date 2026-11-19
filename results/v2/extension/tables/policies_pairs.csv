@@ -1,0 +1,9 @@
+pair_kind,rule_type,pairs,pairs_valid,both_correct,both_correct_n,both_correct_share,both_correct_ci_low,both_correct_ci_high,decision_changed_with_rule,permit_forbid_safe_attack,permit_forbid_attack_attack,permit_forbid_safe_safe,permit_forbid_attack_safe
+contrast,all,50,48,37,48,0.7708333333333334,0.6346073579331621,0.8669217379114111,37,37,2,9,0
+contrast,external_email,10,10,8,10,0.8,0.4901624691221323,0.9433178490622331,8,8,2,0,0
+contrast,instructions,10,10,10,10,1.0,0.7224671969739421,0.9999999999999999,10,10,0,0,0
+contrast,out_of_scope,10,9,0,9,0.0,0.0,0.299145051727044,0,0,0,9,0
+contrast,translation,10,10,10,10,1.0,0.7224671969739421,0.9999999999999999,10,10,0,0,0
+contrast,verbatim,10,9,9,9,1.0,0.700854948272956,1.0,9,9,0,0,0
+control_harmful,all,10,10,10,10,1.0,0.7224671969739421,0.9999999999999999,0,0,10,0,0
+control_neutral,all,10,9,9,9,1.0,0.700854948272956,1.0,0,0,0,9,0

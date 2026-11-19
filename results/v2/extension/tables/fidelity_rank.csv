@@ -1,0 +1,4 @@
+run_mode,prompts,mean_rank_of_recorded,expected_if_exchangeable,share_recorded_lowest,share_recorded_in_lowest_quarter
+all,200,10.7525,11.0,0.04,0.245
+attacks,100,11.03,11.0,0.03,0.23
+safe,100,10.475,11.0,0.05,0.26
