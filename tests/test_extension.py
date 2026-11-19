@@ -58,6 +58,8 @@ def test_extension_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["extension.py", "--run", str(tmp_path), "--out", str(tmp_path / "t")])
     tables.main()
     assert len(pd.read_csv(tmp_path / "C" / "answers.csv")) == 70   # one answer per pair
+    same = pd.read_csv(tmp_path / "t" / "policies_same_answer_check.csv").iloc[0]
+    assert same.pairs == same.pairs_same_answer == 70
     pairs = pd.read_csv(tmp_path / "t" / "policies_pairs.csv").set_index(["pair_kind", "rule_type"])
     assert pairs.loc[("contrast", "all"), "both_correct"] == 50
     assert pairs.loc[("control_neutral", "all"), "both_correct"] == 0

@@ -87,8 +87,12 @@ def policies(plan: Path, run: Path, out: Path) -> None:
     excluded = plan / "policy_pairs_excluded.csv"   # pairs removed by the author before the run, if any
     if excluded.exists():
         items = items[~items.pair.isin(pd.read_csv(excluded).pair)]
-    rep = pd.read_csv(path).drop_duplicates("item", keep="last")
+    rep = pd.read_csv(path).drop_duplicates("item", keep="last").drop(columns=["pair"], errors="ignore")
     df = items.merge(rep, on="item", how="left")
+    # the two items of a pair must have been judged with the same answer of the victim
+    same = df.groupby("pair").answer_sha256.nunique(dropna=True).le(1)
+    pd.DataFrame({"pairs": [len(same)], "pairs_same_answer": [int(same.sum())]}).to_csv(
+        out / "policies_same_answer_check.csv", index=False)
     df["judge_ok"] = df.judge_ok.astype(str).eq("True")
     df["correct"] = df.judge_ok & df.decision.eq(df.expected_decision)
 

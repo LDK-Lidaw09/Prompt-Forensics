@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import random
 import sys
@@ -91,6 +92,10 @@ def failure(out: Path, step: str, item: str, exc: BaseException) -> None:
     traceback.print_exc()
 
 
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def victim(prompt: str, model: str, seed: int) -> dict[str, Any]:
     response = call_llm(prompt, model, {**VICTIM_PARAMS, "seed": seed})
     return {"text": response.text, "finish_reason": getattr(response, "finish_reason", "") or "",
@@ -124,7 +129,8 @@ def cmd_policies_victim(args) -> None:
                     "dataset": row["dataset"], "safe_prompt": row["request"]}
         try:
             answer = victim(build_victim_prompt(scenario, "safe"), args.victim, SEED_BASE)
-            append_csv(out / "answers.csv", {"pair": row["pair"], "seed": SEED_BASE, **answer, "created_at": now()})
+            append_csv(out / "answers.csv", {"pair": row["pair"], "seed": SEED_BASE, **answer,
+                                             "answer_sha256": sha256_text(answer["text"]), "created_at": now()})
         except Exception as exc:   # noqa: BLE001 - every failure is recorded with its cause
             failure(out, "policies-victim", row["pair"], exc)
 
@@ -148,7 +154,8 @@ def cmd_policies_judge(args) -> None:
                 guided_json=True, guided_backend="xgrammar", dataset_max_chars=1000)
             d = report.as_dict()
             append_csv(out / "investigator.csv", {
-                "item": row["item"], "judge_ok": report.ok, "judge_error": report.error or "",
+                "item": row["item"], "pair": row["pair"],
+                "answer_sha256": sha256_text(answers[row["pair"]]["text"]), "judge_ok": report.ok, "judge_error": report.error or "",
                 "decision": d["decision"], "maliciousness_score": d["maliciousness_score"],
                 "adversarial_types": json.dumps(d["adversarial_types"]),
                 "guardrail_violations": json.dumps(d["guardrail_violations"], ensure_ascii=False),
