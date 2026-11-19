@@ -1,8 +1,8 @@
 # Protocol: chained verdicts, contrasted policies and Fidelity against a recorded answer
 
 Status: experiments B2 and D **validated by the author on 2026-11-18**;
-experiment C **revised on 2026-11-19 after the author's check, to be validated
-again before the run**. Once validated, this file is not changed afterwards;
+experiment C **revised on 2026-11-19 after the author's check and validated
+again by the author on 2026-11-19**. This file is not changed afterwards;
 any deviation is reported as a deviation in the results. The check of the
 pairs of experiment C (sheet `policy_pairs_check_v2.xlsx`) is recorded apart,
 before the run, with the list of removed pairs.
