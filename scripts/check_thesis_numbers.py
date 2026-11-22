@@ -90,13 +90,13 @@ FIGURES: list[Figure] = [
            "replay_stability.csv", MISTRAL_ATT, "cons_score_mean"),
     Figure("6.2, mean cosine Consistency, legitimate prompts", "0.948",
            "replay_stability.csv", MISTRAL_SAFE, "cons_score_mean"),
-    Figure("Table 6.6, attack pools with no unsafe answer, cosine", "0.885",
+    Figure("Table 6.3, attack pools with no unsafe answer, cosine", "0.885",
            "stability_vs_verdict.csv", ATT, "cos_mean_k0"),
-    Figure("Table 6.6, attack pools with an unsafe answer, cosine", "0.884",
+    Figure("Table 6.3, attack pools with an unsafe answer, cosine", "0.884",
            "stability_vs_verdict.csv", ATT, "cos_mean_k1"),
-    Figure("Table 6.6, AUC of low cosine Consistency (attacks)", "0.51",
+    Figure("Table 6.3, AUC of low cosine Consistency (attacks)", "0.51",
            "stability_vs_verdict.csv", ATT, "auc_low_cos_predicts_any_unsafe"),
-    Figure("Table 6.6, AUC of low BERTScore Consistency (attacks)", "0.63",
+    Figure("Table 6.3, AUC of low BERTScore Consistency (attacks)", "0.63",
            "stability_vs_verdict.csv", ATT, "auc_low_bert_predicts_any_unsafe"),
     # Section 6.3.5: human check of the Evaluator.
     Figure("6.3.5, weighted precision of the Evaluator", "87%",
@@ -121,13 +121,13 @@ FIGURES: list[Figure] = [
     Figure("6.3.5, pool check, attack pools with 1-5 malicious answers", "46.7%",
            "pool_check_status.csv", {"stratum": "A3 attaque, 1-5 malicious"}, "share"),
     # Section 6.4: Investigators (decision field).
-    Figure("Table 6.10, Qwen3-14B recall", "97.9%",
+    Figure("Table 6.7, Qwen3-14B recall", "97.9%",
            "investigator_summary.csv", {"judge": "Qwen3-14B", "rule": "decision"}, "recall"),
-    Figure("Table 6.10, Qwen3-14B false-positive rate", "0.03%",
+    Figure("Table 6.7, Qwen3-14B false-positive rate", "0.03%",
            "investigator_summary.csv", {"judge": "Qwen3-14B", "rule": "decision"}, "fpr"),
-    Figure("Table 6.10, Ministral-8B recall", "80.1%",
+    Figure("Table 6.7, Ministral-8B recall", "80.1%",
            "investigator_summary.csv", {"judge": "Ministral-8B", "rule": "decision"}, "recall"),
-    Figure("Table 6.10, Phi-4-reasoning false-positive rate", "23.0%",
+    Figure("Table 6.7, Phi-4-reasoning false-positive rate", "23.0%",
            "investigator_summary.csv", {"judge": "Phi-4-reasoning", "rule": "decision"}, "fpr"),
     # Section 6.2.6 / 5.5.2: whitespace control.
     Figure("6.2, same verdict, base vs original order (attacks)", "90.6%",
@@ -135,55 +135,55 @@ FIGURES: list[Figure] = [
     Figure("6.2, same verdict, original vs perturbed whitespace (attacks)", "79.5%",
            "whitespace_baseline.csv", {**ATT, "comparison": "orig vs pert"}, "same_verdict"),
     # Cells of chapter 6 tables checked one by one at the final reading.
-    Figure("Table 6.2, legitimate pools with BERTScore Consistency >= 0.9", "84.7%",
+    Figure("Table 6.1, legitimate pools with BERTScore Consistency >= 0.9", "84.7%",
            "replay_stability.csv", MISTRAL_SAFE, "cons_bert_score_frac_ge0.9"),
-    Figure("Table 6.4, legitimate pairs with cosine >= 0.85", "95.8%",
+    Figure("Table B.6, legitimate pairs with cosine >= 0.85", "95.8%",
            "tau_sweep.csv", {"victim": "Mistral-7B", "mode": "safe", "tau": 0.85}, "frac_pairs_ge"),
-    Figure("Table 6.8, JailbreakDB-style third, all families", "73.6%",
+    Figure("Table 6.5, JailbreakDB-style third, all families", "73.6%",
            "tail_risk_by_source.csv", {"source": "JailbreakDB", "family": None}, "tail"),
-    Figure("Table 6.8, WildJailbreak third, upper bound", "86.0%",
+    Figure("Table 6.5, WildJailbreak third, upper bound", "86.0%",
            "tail_risk_by_source.csv", {"source": "WildJailbreak", "family": None}, "hi"),
-    Figure("Table 6.9, attack precision, upper bound", "0.942",
+    Figure("Table 6.6, attack precision, upper bound", "0.942",
            "evaluator_check_invented_rule.csv",
            {**ANN_ATT, "measure": "evaluator_precision"}, "ci_high"),
-    Figure("Table 6.9, attack share unsafe (annotation), lower bound", "44.6%",
+    Figure("Table 6.6, attack share unsafe (annotation), lower bound", "44.6%",
            "evaluator_check_invented_rule.csv",
            {**ANN_ATT, "measure": "share_unsafe_annotation"}, "ci_low"),
-    Figure("Table 6.9, attack share unsafe (annotation), upper bound", "67.5%",
+    Figure("Table 6.6, attack share unsafe (annotation), upper bound", "67.5%",
            "evaluator_check_invented_rule.csv",
            {**ANN_ATT, "measure": "share_unsafe_annotation"}, "ci_high"),
-    Figure("Table 6.9, legitimate precision, lower bound", "0.161",
+    Figure("Table 6.6, legitimate precision, lower bound", "0.161",
            "evaluator_check_invented_rule.csv",
            {**ANN_SAFE, "measure": "evaluator_precision"}, "ci_low"),
-    Figure("Table 6.9, legitimate precision, upper bound", "0.508",
+    Figure("Table 6.6, legitimate precision, upper bound", "0.508",
            "evaluator_check_invented_rule.csv",
            {**ANN_SAFE, "measure": "evaluator_precision"}, "ci_high"),
-    Figure("Table 6.9, legitimate recall, upper bound", "0.053",
+    Figure("Table 6.6, legitimate recall, upper bound", "0.053",
            "evaluator_check_invented_rule.csv",
            {**ANN_SAFE, "measure": "evaluator_recall"}, "ci_high"),
-    Figure("Table 6.9, legitimate share unsafe (annotation)", "17.7%",
+    Figure("Table 6.6, legitimate share unsafe (annotation)", "17.7%",
            "evaluator_check_invented_rule.csv",
            {**ANN_SAFE, "measure": "share_unsafe_annotation"}, "value"),
-    Figure("Table 6.9, legitimate share unsafe (annotation), lower bound", "5.8%",
+    Figure("Table 6.6, legitimate share unsafe (annotation), lower bound", "5.8%",
            "evaluator_check_invented_rule.csv",
            {**ANN_SAFE, "measure": "share_unsafe_annotation"}, "ci_low"),
-    Figure("Table 6.9, legitimate share unsafe (annotation), upper bound", "33.3%",
+    Figure("Table 6.6, legitimate share unsafe (annotation), upper bound", "33.3%",
            "evaluator_check_invented_rule.csv",
            {**ANN_SAFE, "measure": "share_unsafe_annotation"}, "ci_high"),
-    Figure("Table 6.15, legitimate prompts at T=0, lower bound", "0.4%",
+    Figure("Table 6.11, legitimate prompts at T=0, lower bound", "0.4%",
            "sensitivity_temperature.csv", {"temperature": 0.0, "run_mode": "safe"}, "any_unsafe_lo"),
-    Figure("Table 6.15, legitimate Consistency at T=1.0", "0.916",
+    Figure("Table 6.11, legitimate Consistency at T=1.0", "0.916",
            "sensitivity_temperature.csv", {"temperature": 1.0, "run_mode": "safe"}, "consistency_mean"),
-    Figure("Table 6.17, same-run recall with the answer, lower bound", "97.2%",
+    Figure("Table 6.12, same-run recall with the answer, lower bound", "97.2%",
            "sensitivity_ablation.csv",
            {"baseline": "same run, temperature sample", "run_mode": "attacks"}, "with_lo"),
-    Figure("Table 6.17, same-run recall with the answer, upper bound", "99.3%",
+    Figure("Table 6.12, same-run recall with the answer, upper bound", "99.3%",
            "sensitivity_ablation.csv",
            {"baseline": "same run, temperature sample", "run_mode": "attacks"}, "with_hi"),
 ]
 
 
-# Table 6.3: quantiles of the similarity between answers to different prompts,
+# Table 6.2: quantiles of the similarity between answers to different prompts,
 # recomputed from the archived pairs (5,000 pairs per run mode and kind).
 REFERENCE_PAIRS = "reference_distribution_pairs.csv"
 TABLE_6_3 = {
@@ -201,7 +201,7 @@ QUANTILES = (0.05, 0.50, 0.95, 0.99)
 
 
 def check_reference_quantiles(tables: Path = DEFAULT_TABLES) -> list[tuple[str, str, float, bool]]:
-    """Compare the quantiles printed in Table 6.3 with the archived pairs."""
+    """Compare the quantiles printed in Table 6.2 with the archived pairs."""
     pairs = pd.read_csv(tables / REFERENCE_PAIRS)
     results = []
     for (mode, kind), columns in TABLE_6_3.items():
@@ -211,7 +211,7 @@ def check_reference_quantiles(tables: Path = DEFAULT_TABLES) -> list[tuple[str, 
         for column, printed in columns.items():
             for q, text in zip(QUANTILES, printed):
                 value = float(group[column].quantile(q))
-                where = f"Table 6.3, {mode} {kind}, {column} quantile {q:g}"
+                where = f"Table 6.2, {mode} {kind}, {column} quantile {q:g}"
                 results.append((where, text, value, round(value, 3) == float(text)))
     return results
 
@@ -291,7 +291,7 @@ def main() -> int:
         failures += not ok
         print(f"{status}  {printed:>7}  archived {value:.4f}{unit}  {where}  [{table}]")
     print(f"\n{len(rows) - failures} of {len(rows)} figures match their table.")
-    print("Not covered: Table 6.5 (answer lengths) and the failure causes of Table 6.1,")
+    print("Not covered: Table B.7 (answer lengths) and the failure causes of Table B.5,")
     print("which come from the raw files of the Hugging Face dataset.")
     return 1 if failures or changed else 0
 
