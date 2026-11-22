@@ -1,0 +1,44 @@
+{
+  "prompts": 50,
+  "captured": 50,
+  "replays": 500,
+  "records": {
+    "replay": 500,
+    "live": 50
+  },
+  "annotations": {
+    "evaluator": 499,
+    "investigator": 49,
+    "report": 50
+  },
+  "failures": {
+    "evaluator": 1,
+    "investigator": 1
+  },
+  "reports": 50,
+  "anchor": {
+    "records": 550,
+    "chain_hash": "e3d9c281e0abfe800f4def3f377afd27be52dbecb7d1bfff813a06ef1ba128db",
+    "annotations": 598,
+    "annotation_chain_hash": "d20de4f001fbaa9e962accd15c98204abe5312b63759b039fd9aa44c75ec6061",
+    "created_at": "2026-11-19T15:28:24.173574Z"
+  },
+  "replays_with_divergence": 450,
+  "replays_unlinked": 0,
+  "verification": {
+    "checked": 550,
+    "problems": [],
+    "cli": [
+      {
+        "command": "scripts/verify_evidence.py results/v2/extension/B2/evidence.sqlite --public-key results/v2/extension/B2/public_key.pem",
+        "exit_code": 0,
+        "output": "550 interactions and 598 annotations checked (0 without chain fields), 0 problem(s)"
+      },
+      {
+        "command": "scripts/anchor_evidence.py verify results/v2/extension/B2/evidence.sqlite results/v2/extension/B2/anchor.json --public-key results/v2/extension/B2/public_key.pem",
+        "exit_code": 0,
+        "output": "550 interactions checked against 1 anchor(s), 0 problem(s)"
+      }
+    ]
+  }
+}

@@ -23,6 +23,15 @@ Integrity guarantees, from weakest to strongest:
    with an RFC 3161 timestamp (``scripts/anchor_evidence.py``), it fixes the
    history up to that point.
 
+Annotations (the verdicts and reports of the judges) have a chain of their
+own, with the same layers: each one carries the hash of its result, the
+parameters of the judge, the ``chain_hash`` and ``response_hash`` of the
+interaction it judges, the ``chain_hash`` of the previous annotation and a
+signature. Changing a verdict, a report or the answer that a verdict refers
+to therefore breaks the annotation chain or its binding to the interaction.
+The anchor also fixes the head of the annotation chain. Annotations written
+before this chain existed (empty chain fields) are listed as unchained.
+
 :meth:`EvidenceStore.verify` checks these properties and reports every
 problem it finds.
 """
@@ -74,7 +83,14 @@ CREATE TABLE IF NOT EXISTS annotations (
     kind            TEXT NOT NULL,        -- self_audit | investigator | ...
     model           TEXT,
     result_json     TEXT NOT NULL,
-    result_hash     TEXT NOT NULL
+    result_hash     TEXT NOT NULL,
+    params_json     TEXT,                 -- judge settings and prompt version
+    target_chain_hash    TEXT,            -- chain_hash of the judged interaction
+    target_response_hash TEXT,            -- response_hash of the judged interaction
+    prev_chain_hash TEXT,
+    chain_hash      TEXT,
+    signature       TEXT,
+    public_key_pem  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_annotations_interaction ON annotations(interaction_id);
 
@@ -115,6 +131,23 @@ CHAINED_FIELDS = (
 )
 
 
+# Columns of ``annotations`` added after the first version of the store; older
+# files get them (empty) when they are opened.
+ANNOTATION_CHAIN_COLUMNS = ("params_json", "target_chain_hash", "target_response_hash",
+                            "prev_chain_hash", "chain_hash", "signature", "public_key_pem")
+ANNOTATION_CHAINED_FIELDS = (
+    "interaction_id", "created_at", "kind", "model", "result_hash", "target_chain_hash",
+    "target_response_hash", "prev_chain_hash",
+)
+
+
+def annotation_digest(row: Mapping[str, Any]) -> str:
+    """Digest of one annotation: its fields, its result, its judge settings and its target."""
+    record = {name: row[name] for name in ANNOTATION_CHAINED_FIELDS}
+    record["params_sha256"] = sha256_hex(row["params_json"] or "")
+    return sha256_hex(canonical_json(record))
+
+
 def chain_digest(row: Mapping[str, Any]) -> str:
     """Digest that covers every stored field of a row and links it to the previous one.
 
@@ -148,6 +181,8 @@ class VerificationReport:
 
     checked: int = 0
     problems: list[str] = field(default_factory=list)
+    annotations_checked: int = 0
+    unchained_annotations: int = 0
 
     @property
     def ok(self) -> bool:
@@ -157,17 +192,32 @@ class VerificationReport:
 class EvidenceStore:
     """Thin wrapper around the SQLite evidence file."""
 
-    def __init__(self, db_path: str | Path, signing_key: SigningKey | None = None):
+    def __init__(self, db_path: str | Path, signing_key: SigningKey | None = None, read_only: bool = False):
+        """Open (or create) the evidence file.
+
+        With ``read_only=True`` the file is neither created nor changed, which
+        is how a verifier should open an evidence file it was handed.
+        """
         self.db_path = str(db_path)
         self.signing_key = signing_key
+        self.read_only = read_only
+        if read_only:
+            return
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
+            present = {r["name"] for r in conn.execute("PRAGMA table_info(annotations)")}
+            for column in ANNOTATION_CHAIN_COLUMNS:
+                if column not in present:
+                    conn.execute(f"ALTER TABLE annotations ADD COLUMN {column} TEXT")
             conn.executescript(_append_only_triggers())
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        if self.read_only:
+            conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True, timeout=30)
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
         conn.row_factory = sqlite3.Row
         try:
             yield conn
@@ -250,15 +300,44 @@ class EvidenceStore:
         return StoredInteraction(new_id, pid, chash, rhash, digest, signature is not None)
 
     def add_annotation(
-        self, interaction_id: int, kind: str, result: Mapping[str, Any], model: str | None = None
+        self, interaction_id: int, kind: str, result: Mapping[str, Any], model: str | None = None,
+        params: Mapping[str, Any] | None = None,
     ) -> int:
-        """Attach a verdict (self-audit, judge, ...) to a stored interaction."""
+        """Attach a verdict (self-audit, judge, report, ...) to a stored interaction.
+
+        The annotation is chained, signed and bound to the interaction it
+        judges (its ``chain_hash`` and ``response_hash``). ``params`` records
+        the settings of the judge (temperature, seed, prompt version, ...).
+        A repeated judgement is a new annotation; earlier ones are kept.
+        """
         result_json = json.dumps(dict(result), ensure_ascii=False, sort_keys=True)
+        params_json = canonical_json(dict(params)) if params else ""
         with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            target = conn.execute(
+                "SELECT chain_hash, response_hash FROM interactions WHERE id = ?", (interaction_id,)
+            ).fetchone()
+            if target is None:
+                raise KeyError(f"no interaction {interaction_id}")
+            last = conn.execute(
+                "SELECT chain_hash FROM annotations WHERE chain_hash IS NOT NULL ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            record = {
+                "interaction_id": interaction_id, "created_at": utc_now(), "kind": kind, "model": model,
+                "result_hash": sha256_hex(result_json), "params_json": params_json,
+                "target_chain_hash": target["chain_hash"], "target_response_hash": target["response_hash"],
+                "prev_chain_hash": last["chain_hash"] if last else GENESIS_HASH,
+            }
+            digest = annotation_digest(record)
+            signature = self.signing_key.sign_digest(digest) if self.signing_key else None
+            public_key = self.signing_key.public_key_pem if self.signing_key else None
             cursor = conn.execute(
-                "INSERT INTO annotations (interaction_id, created_at, kind, model, result_json, "
-                "result_hash) VALUES (?, ?, ?, ?, ?, ?)",
-                (interaction_id, utc_now(), kind, model, result_json, sha256_hex(result_json)),
+                "INSERT INTO annotations (interaction_id, created_at, kind, model, result_json, result_hash, "
+                "params_json, target_chain_hash, target_response_hash, prev_chain_hash, chain_hash, "
+                "signature, public_key_pem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (interaction_id, record["created_at"], kind, model, result_json, record["result_hash"],
+                 params_json, record["target_chain_hash"], record["target_response_hash"],
+                 record["prev_chain_hash"], digest, signature, public_key),
             )
             return int(cursor.lastrowid)
 
@@ -334,9 +413,13 @@ class EvidenceStore:
         """Head of the chain: keep it outside the system to fix the history so far."""
         with self._connect() as conn:
             rows = conn.execute("SELECT chain_hash FROM interactions ORDER BY id").fetchall()
+            notes = conn.execute(
+                "SELECT chain_hash FROM annotations WHERE chain_hash IS NOT NULL ORDER BY id").fetchall()
         return {
             "records": len(rows),
             "chain_hash": rows[-1]["chain_hash"] if rows else GENESIS_HASH,
+            "annotations": len(notes),
+            "annotation_chain_hash": notes[-1]["chain_hash"] if notes else GENESIS_HASH,
             "created_at": utc_now(),
         }
 
@@ -384,6 +467,8 @@ class EvidenceStore:
 
             expected_prev = row["chain_hash"]
 
+        self._verify_annotations(report, rows, trusted_public_key_pem, anchors or [])
+
         heads = [row["chain_hash"] for row in rows]
         for anchor in anchors or []:
             n, when = int(anchor["records"]), anchor.get("created_at", "?")
@@ -397,3 +482,54 @@ class EvidenceStore:
                     f"anchor of {when}: record {n} no longer has the anchored chain hash "
                     "(the history was rewritten)")
         return report
+
+    def _verify_annotations(self, report: VerificationReport, interactions: list[sqlite3.Row],
+                            trusted_public_key_pem: str | None, anchors: list[Mapping[str, Any]]) -> None:
+        """Result hashes, chain, signatures and bindings of the annotations."""
+        with self._connect() as conn:
+            notes = conn.execute("SELECT * FROM annotations ORDER BY id").fetchall()
+        targets = {row["id"]: row for row in interactions}
+        expected_prev = GENESIS_HASH
+        heads = []
+        for note in notes:
+            nid = f"annotation {note['id']}"
+            report.annotations_checked += 1
+            if sha256_hex(note["result_json"]) != note["result_hash"]:
+                report.problems.append(f"{nid}: result_hash does not match the result")
+            if "chain_hash" not in note.keys() or note["chain_hash"] is None:
+                report.unchained_annotations += 1
+                continue
+            heads.append(note["chain_hash"])
+            if note["prev_chain_hash"] != expected_prev:
+                report.problems.append(f"{nid}: annotation chain broken (an annotation was removed or reordered)")
+            if annotation_digest(note) != note["chain_hash"]:
+                report.problems.append(f"{nid}: annotation chain_hash does not match its content")
+            key = trusted_public_key_pem or note["public_key_pem"]
+            if note["signature"] is None:
+                report.problems.append(f"{nid}: not signed")
+            elif not key or not verify_signature(key, note["chain_hash"], note["signature"]):
+                report.problems.append(f"{nid}: invalid signature")
+            target = targets.get(note["interaction_id"])
+            if target is None:
+                report.problems.append(f"{nid}: binding broken (the judged interaction is missing)")
+            elif (target["chain_hash"] != note["target_chain_hash"]
+                  or target["response_hash"] != note["target_response_hash"]):
+                report.problems.append(f"{nid}: binding broken (the judged interaction was changed)")
+            expected_prev = note["chain_hash"]
+        if heads and report.unchained_annotations:
+            report.problems.append(
+                f"{report.unchained_annotations} annotation(s) without chain fields in a store whose "
+                "annotations are chained")
+        for anchor in anchors:
+            if "annotations" not in anchor:
+                continue
+            n, when = int(anchor["annotations"]), anchor.get("created_at", "?")
+            if n == 0:
+                continue
+            if n > len(heads):
+                report.problems.append(
+                    f"anchor of {when}: {n} annotations anchored, {len(heads)} left (annotations were removed)")
+            elif heads[n - 1] != anchor["annotation_chain_hash"]:
+                report.problems.append(
+                    f"anchor of {when}: annotation {n} no longer has the anchored chain hash "
+                    "(the annotation history was rewritten)")

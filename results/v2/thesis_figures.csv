@@ -1,0 +1,370 @@
+figure,place,printed,kind,table,selector,column
+6.1-r1c1-0,"Table 6.1, Consistency, cosine / Attack prompts (21,600)",0.884,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_score_mean
+6.1-r1c1-1,"Table 6.1, Consistency, cosine / Attack prompts (21,600)",0.050,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_score_sd
+6.1-r1c2-0,"Table 6.1, Consistency, cosine / Legitimate prompts (19,981)",0.948,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_score_mean
+6.1-r1c2-1,"Table 6.1, Consistency, cosine / Legitimate prompts (19,981)",0.033,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_score_sd
+6.1-r2c1-0,"Table 6.1, Consistency, BERTScore F₁ / Attack prompts (21,600)",0.893,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_bert_score_mean
+6.1-r2c1-1,"Table 6.1, Consistency, BERTScore F₁ / Attack prompts (21,600)",0.023,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_bert_score_sd
+6.1-r2c2-0,"Table 6.1, Consistency, BERTScore F₁ / Legitimate prompts (19,981)",0.922,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_bert_score_mean
+6.1-r2c2-1,"Table 6.1, Consistency, BERTScore F₁ / Legitimate prompts (19,981)",0.025,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_bert_score_sd
+6.1-r3c1-0,"Table 6.1, Fidelity, cosine / Attack prompts (21,600)",0.882,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",fid_score_mean
+6.1-r3c1-1,"Table 6.1, Fidelity, cosine / Attack prompts (21,600)",0.061,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",fid_score_sd
+6.1-r3c2-0,"Table 6.1, Fidelity, cosine / Legitimate prompts (19,981)",0.948,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",fid_score_mean
+6.1-r3c2-1,"Table 6.1, Fidelity, cosine / Legitimate prompts (19,981)",0.037,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",fid_score_sd
+6.1-r4c1-0,"Table 6.1, Fidelity, BERTScore F₁ / Attack prompts (21,600)",0.892,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",fid_bert_score_mean
+6.1-r4c1-1,"Table 6.1, Fidelity, BERTScore F₁ / Attack prompts (21,600)",0.027,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",fid_bert_score_sd
+6.1-r4c2-0,"Table 6.1, Fidelity, BERTScore F₁ / Legitimate prompts (19,981)",0.922,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",fid_bert_score_mean
+6.1-r4c2-1,"Table 6.1, Fidelity, BERTScore F₁ / Legitimate prompts (19,981)",0.028,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",fid_bert_score_sd
+6.1-r5c1-0,"Table 6.1, Smallest pair similarity in the pool, cosine / Attack prompts (21,600)",0.653,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_min_mean
+6.1-r5c1-1,"Table 6.1, Smallest pair similarity in the pool, cosine / Attack prompts (21,600)",0.126,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_min_sd
+6.1-r5c2-0,"Table 6.1, Smallest pair similarity in the pool, cosine / Legitimate prompts (19,981)",0.838,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_min_mean
+6.1-r5c2-1,"Table 6.1, Smallest pair similarity in the pool, cosine / Legitimate prompts (19,981)",0.092,num,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_min_sd
+6.1-r6c1-0,"Table 6.1, Pools with Consistency ≥ 0.9, cosine / Attack prompts (21,600)",41.3,pct,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_score_frac_ge0.9
+6.1-r6c2-0,"Table 6.1, Pools with Consistency ≥ 0.9, cosine / Legitimate prompts (19,981)",92.5,pct,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_score_frac_ge0.9
+6.1-r7c1-0,"Table 6.1, Pools with Consistency ≥ 0.9, BERTScore / Attack prompts (21,600)",35.0,pct,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_bert_score_frac_ge0.9
+6.1-r7c2-0,"Table 6.1, Pools with Consistency ≥ 0.9, BERTScore / Legitimate prompts (19,981)",84.7,pct,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_bert_score_frac_ge0.9
+6.1-r8c1-0,"Table 6.1, Share of pairs ≥ 0.9 in a pool, cosine (mean of Aτ) / Attack prompts (21,600)",51.5,pct,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",cons_pairs_ge0.9
+6.1-r8c2-0,"Table 6.1, Share of pairs ≥ 0.9 in a pool, cosine (mean of Aτ) / Legitimate prompts (19,981)",88.9,pct,replay_stability.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",cons_pairs_ge0.9
+B.6-r1c1-0,"Table B.6, 0.80 / Cosine, attack",86.0,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.8}",frac_pairs_ge
+B.6-r1c2-0,"Table B.6, 0.80 / Cosine, legitimate",98.2,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.8}",frac_pairs_ge
+B.6-r1c3-0,"Table B.6, 0.80 / BERTScore, attack",99.3,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.8}",bert_frac_pairs_ge
+B.6-r1c4-0,"Table B.6, 0.80 / BERTScore, legitimate",99.2,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.8}",bert_frac_pairs_ge
+B.6-r2c1-0,"Table B.6, 0.85 / Cosine, attack",73.2,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.85}",frac_pairs_ge
+B.6-r2c2-0,"Table B.6, 0.85 / Cosine, legitimate",95.8,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.85}",frac_pairs_ge
+B.6-r2c3-0,"Table B.6, 0.85 / BERTScore, attack",90.7,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.85}",bert_frac_pairs_ge
+B.6-r2c4-0,"Table B.6, 0.85 / BERTScore, legitimate",97.3,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.85}",bert_frac_pairs_ge
+B.6-r3c1-0,"Table B.6, 0.90 / Cosine, attack",51.5,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.9}",frac_pairs_ge
+B.6-r3c2-0,"Table B.6, 0.90 / Cosine, legitimate",88.9,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.9}",frac_pairs_ge
+B.6-r3c3-0,"Table B.6, 0.90 / BERTScore, attack",40.5,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.9}",bert_frac_pairs_ge
+B.6-r3c4-0,"Table B.6, 0.90 / BERTScore, legitimate",77.8,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.9}",bert_frac_pairs_ge
+B.6-r4c1-0,"Table B.6, 0.93 / Cosine, attack",34.0,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.93}",frac_pairs_ge
+B.6-r4c2-0,"Table B.6, 0.93 / Cosine, legitimate",77.7,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.93}",frac_pairs_ge
+B.6-r4c3-0,"Table B.6, 0.93 / BERTScore, attack",13.4,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.93}",bert_frac_pairs_ge
+B.6-r4c4-0,"Table B.6, 0.93 / BERTScore, legitimate",39.7,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.93}",bert_frac_pairs_ge
+B.6-r5c1-0,"Table B.6, 0.95 / Cosine, attack",21.1,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.95}",frac_pairs_ge
+B.6-r5c2-0,"Table B.6, 0.95 / Cosine, legitimate",62.8,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.95}",frac_pairs_ge
+B.6-r5c3-0,"Table B.6, 0.95 / BERTScore, attack",5.5,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.95}",bert_frac_pairs_ge
+B.6-r5c4-0,"Table B.6, 0.95 / BERTScore, legitimate",18.9,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.95}",bert_frac_pairs_ge
+B.6-r6c1-0,"Table B.6, 0.98 / Cosine, attack",4.2,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.98}",frac_pairs_ge
+B.6-r6c2-0,"Table B.6, 0.98 / Cosine, legitimate",21.7,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.98}",frac_pairs_ge
+B.6-r6c3-0,"Table B.6, 0.98 / BERTScore, attack",1.5,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""tau"": 0.98}",bert_frac_pairs_ge
+B.6-r6c4-0,"Table B.6, 0.98 / BERTScore, legitimate",6.0,pct,tau_sweep.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""tau"": 0.98}",bert_frac_pairs_ge
+6.3-r1c1-0,"Table 6.3, Pools with no unsafe answer / with at least one / Attack prompts",5879,int,stability_vs_verdict.csv,"{""mode"": ""attacks""}",k0
+6.3-r1c1-1,"Table 6.3, Pools with no unsafe answer / with at least one / Attack prompts",15690,int,stability_vs_verdict.csv,"{""mode"": ""attacks""}",k1
+6.3-r1c2-0,"Table 6.3, Pools with no unsafe answer / with at least one / Legitimate prompts",18766,int,stability_vs_verdict.csv,"{""mode"": ""safe""}",k0
+6.3-r1c2-1,"Table 6.3, Pools with no unsafe answer / with at least one / Legitimate prompts",1207,int,stability_vs_verdict.csv,"{""mode"": ""safe""}",k1
+6.3-r2c1-0,"Table 6.3, Mean Consistency, cosine: no unsafe / at least one / Attack prompts",0.885,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",cos_mean_k0
+6.3-r2c1-1,"Table 6.3, Mean Consistency, cosine: no unsafe / at least one / Attack prompts",0.884,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",cos_mean_k1
+6.3-r2c2-0,"Table 6.3, Mean Consistency, cosine: no unsafe / at least one / Legitimate prompts",0.949,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",cos_mean_k0
+6.3-r2c2-1,"Table 6.3, Mean Consistency, cosine: no unsafe / at least one / Legitimate prompts",0.940,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",cos_mean_k1
+6.3-r3c1-0,"Table 6.3, Mean Consistency, BERTScore: no unsafe / at least one / Attack prompts",0.900,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",bert_mean_k0
+6.3-r3c1-1,"Table 6.3, Mean Consistency, BERTScore: no unsafe / at least one / Attack prompts",0.890,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",bert_mean_k1
+6.3-r3c2-0,"Table 6.3, Mean Consistency, BERTScore: no unsafe / at least one / Legitimate prompts",0.923,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",bert_mean_k0
+6.3-r3c2-1,"Table 6.3, Mean Consistency, BERTScore: no unsafe / at least one / Legitimate prompts",0.916,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",bert_mean_k1
+6.3-r4c1-0,"Table 6.3, AUC: low cosine Consistency predicts at least one unsafe answer / Attack prompts",0.51,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",auc_low_cos_predicts_any_unsafe
+6.3-r4c2-0,"Table 6.3, AUC: low cosine Consistency predicts at least one unsafe answer / Legitimate prompts",0.58,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",auc_low_cos_predicts_any_unsafe
+6.3-r5c1-0,"Table 6.3, AUC: low BERTScore Consistency predicts at least one unsafe answer / Attack prompts",0.63,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",auc_low_bert_predicts_any_unsafe
+6.3-r5c2-0,"Table 6.3, AUC: low BERTScore Consistency predicts at least one unsafe answer / Legitimate prompts",0.58,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",auc_low_bert_predicts_any_unsafe
+6.3-r6c1-0,"Table 6.3, Pools with both verdicts / Attack prompts",15011,int,stability_vs_verdict.csv,"{""mode"": ""attacks""}",mixed_pools
+6.3-r6c2-0,"Table 6.3, Pools with both verdicts / Legitimate prompts",1203,int,stability_vs_verdict.csv,"{""mode"": ""safe""}",mixed_pools
+6.3-r7c1-0,"Table 6.3, Mean cosine of pairs: both safe / both unsafe / one of each / Attack prompts",0.880,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",mixed_both_safe
+6.3-r7c1-1,"Table 6.3, Mean cosine of pairs: both safe / both unsafe / one of each / Attack prompts",0.900,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",mixed_both_unsafe
+6.3-r7c1-2,"Table 6.3, Mean cosine of pairs: both safe / both unsafe / one of each / Attack prompts",0.865,num,stability_vs_verdict.csv,"{""mode"": ""attacks""}",mixed_mixed
+6.3-r7c2-0,"Table 6.3, Mean cosine of pairs: both safe / both unsafe / one of each / Legitimate prompts",0.940,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",mixed_both_safe
+6.3-r7c2-1,"Table 6.3, Mean cosine of pairs: both safe / both unsafe / one of each / Legitimate prompts",0.955,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",mixed_both_unsafe
+6.3-r7c2-2,"Table 6.3, Mean cosine of pairs: both safe / both unsafe / one of each / Legitimate prompts",0.926,num,stability_vs_verdict.csv,"{""mode"": ""safe""}",mixed_mixed
+6.3-r8c1-0,"Table 6.3, Pools whose mixed pairs are less similar than their same-verdict pairs / Attack prompts",54.7,pct,stability_vs_verdict.csv,"{""mode"": ""attacks""}",mixed_share_pools_mixedpairs_lower
+6.3-r8c2-0,"Table 6.3, Pools whose mixed pairs are less similar than their same-verdict pairs / Legitimate prompts",56.0,pct,stability_vs_verdict.csv,"{""mode"": ""safe""}",mixed_share_pools_mixedpairs_lower
+6.4-r1c1-0,"Table 6.4, Complete pools / Attack prompts",21569,int,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",pools
+6.4-r1c2-0,"Table 6.4, Complete pools / Legitimate prompts",19973,int,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",pools
+6.4-r2c1-0,"Table 6.4, Pools with at least one unsafe answer / Attack prompts",72.7,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_unsafe
+6.4-r2c1-1,"Table 6.4, Pools with at least one unsafe answer / Attack prompts",72.1,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_unsafe_lo
+6.4-r2c1-2,"Table 6.4, Pools with at least one unsafe answer / Attack prompts",73.3,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_unsafe_hi
+6.4-r2c2-0,"Table 6.4, Pools with at least one unsafe answer / Legitimate prompts",6.0,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",tail_unsafe
+6.4-r2c2-1,"Table 6.4, Pools with at least one unsafe answer / Legitimate prompts",5.7,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",tail_unsafe_lo
+6.4-r2c2-2,"Table 6.4, Pools with at least one unsafe answer / Legitimate prompts",6.4,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",tail_unsafe_hi
+6.4-r3c1-0,"Table 6.4, Pools with at least one malicious answer / Attack prompts",35.5,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_malicious
+6.4-r3c1-1,"Table 6.4, Pools with at least one malicious answer / Attack prompts",34.9,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_malicious_lo
+6.4-r3c1-2,"Table 6.4, Pools with at least one malicious answer / Attack prompts",36.2,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_malicious_hi
+6.4-r4c1-0,"Table 6.4, Answers judged unsafe / Attack prompts",25.7,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",rate_unsafe
+6.4-r4c2-0,"Table 6.4, Answers judged unsafe / Legitimate prompts",0.79,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",rate_unsafe
+6.4-r5c1-0,"Table 6.4, Answers judged malicious / Attack prompts",8.0,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",rate_malicious
+6.4-r6c1-0,"Table 6.4, Pools unsafe in all 100 replays / Attack prompts",679,int,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",pools_all_unsafe
+6.4-r6c2-0,"Table 6.4, Pools unsafe in all 100 replays / Legitimate prompts",4,int,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",pools_all_unsafe
+6.4-r7c1-0,"Table 6.4, Median number of unsafe answers, when at least one / Attack prompts",22,int,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",median_k_unsafe_given_any
+6.4-r7c2-0,"Table 6.4, Median number of unsafe answers, when at least one / Legitimate prompts",3,int,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",median_k_unsafe_given_any
+6.5-r1c1-0,"Table 6.5, Belief elicitation / HarmBench",36.6,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": ""belief_elicitation""}",tail
+6.5-r1c2-0,"Table 6.5, Belief elicitation / JailbreakDB-style",80.0,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": ""belief_elicitation""}",tail
+6.5-r1c3-0,"Table 6.5, Belief elicitation / WildJailbreak",83.3,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": ""belief_elicitation""}",tail
+6.5-r1c4-0,"Table 6.5, Belief elicitation / All sources",66.6,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""belief_elicitation""}",tail_unsafe
+6.5-r2c1-0,"Table 6.5, Data leakage / HarmBench",60.3,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": ""data_leakage""}",tail
+6.5-r2c2-0,"Table 6.5, Data leakage / JailbreakDB-style",72.7,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": ""data_leakage""}",tail
+6.5-r2c3-0,"Table 6.5, Data leakage / WildJailbreak",87.4,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": ""data_leakage""}",tail
+6.5-r2c4-0,"Table 6.5, Data leakage / All sources",73.4,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""data_leakage""}",tail_unsafe
+6.5-r3c1-0,"Table 6.5, Deceptive Delight / HarmBench",64.0,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": ""deceptive_delight""}",tail
+6.5-r3c2-0,"Table 6.5, Deceptive Delight / JailbreakDB-style",73.5,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": ""deceptive_delight""}",tail
+6.5-r3c3-0,"Table 6.5, Deceptive Delight / WildJailbreak",84.2,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": ""deceptive_delight""}",tail
+6.5-r3c4-0,"Table 6.5, Deceptive Delight / All sources",73.9,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""deceptive_delight""}",tail_unsafe
+6.5-r4c1-0,"Table 6.5, Jailbreak / HarmBench",75.0,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": ""jailbreak""}",tail
+6.5-r4c2-0,"Table 6.5, Jailbreak / JailbreakDB-style",71.3,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": ""jailbreak""}",tail
+6.5-r4c3-0,"Table 6.5, Jailbreak / WildJailbreak",83.9,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": ""jailbreak""}",tail
+6.5-r4c4-0,"Table 6.5, Jailbreak / All sources",76.7,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""jailbreak""}",tail_unsafe
+6.5-r5c1-0,"Table 6.5, Prompt injection / HarmBench",68.0,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": ""prompt_injection""}",tail
+6.5-r5c2-0,"Table 6.5, Prompt injection / JailbreakDB-style",69.7,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": ""prompt_injection""}",tail
+6.5-r5c3-0,"Table 6.5, Prompt injection / WildJailbreak",86.7,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": ""prompt_injection""}",tail
+6.5-r5c4-0,"Table 6.5, Prompt injection / All sources",74.8,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""prompt_injection""}",tail_unsafe
+6.5-r6c1-0,"Table 6.5, Reverse psychology / HarmBench",52.3,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": ""reverse_psychology""}",tail
+6.5-r6c2-0,"Table 6.5, Reverse psychology / JailbreakDB-style",74.7,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": ""reverse_psychology""}",tail
+6.5-r6c3-0,"Table 6.5, Reverse psychology / WildJailbreak",85.9,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": ""reverse_psychology""}",tail
+6.5-r6c4-0,"Table 6.5, Reverse psychology / All sources",71.0,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""reverse_psychology""}",tail_unsafe
+6.5-r7c1-0,"Table 6.5, All families / HarmBench",59.4,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": null}",tail
+6.5-r7c1-1,"Table 6.5, All families / HarmBench",58.2,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": null}",lo
+6.5-r7c1-2,"Table 6.5, All families / HarmBench",60.5,pct,tail_risk_by_source.csv,"{""source"": ""HarmBench"", ""family"": null}",hi
+6.5-r7c2-0,"Table 6.5, All families / JailbreakDB-style",73.6,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": null}",tail
+6.5-r7c2-1,"Table 6.5, All families / JailbreakDB-style",72.6,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": null}",lo
+6.5-r7c2-2,"Table 6.5, All families / JailbreakDB-style",74.7,pct,tail_risk_by_source.csv,"{""source"": ""JailbreakDB"", ""family"": null}",hi
+6.5-r7c3-0,"Table 6.5, All families / WildJailbreak",85.2,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": null}",tail
+6.5-r7c3-1,"Table 6.5, All families / WildJailbreak",84.4,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": null}",lo
+6.5-r7c3-2,"Table 6.5, All families / WildJailbreak",86.0,pct,tail_risk_by_source.csv,"{""source"": ""WildJailbreak"", ""family"": null}",hi
+6.5-r7c4-0,"Table 6.5, All families / All sources",72.7,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_unsafe
+6.5-r7c4-1,"Table 6.5, All families / All sources",72.1,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_unsafe_lo
+6.5-r7c4-2,"Table 6.5, All families / All sources",73.3,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",tail_unsafe_hi
+6.6-r2c1-0,"Table 6.6, Weighted precision of the Evaluator / Attack prompts",0.867,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_precision""}",value
+6.6-r2c1-1,"Table 6.6, Weighted precision of the Evaluator / Attack prompts",0.783,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_precision""}",ci_low
+6.6-r2c1-2,"Table 6.6, Weighted precision of the Evaluator / Attack prompts",0.942,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_precision""}",ci_high
+6.6-r2c2-0,"Table 6.6, Weighted precision of the Evaluator / Legitimate prompts",0.329,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_precision""}",value
+6.6-r2c2-1,"Table 6.6, Weighted precision of the Evaluator / Legitimate prompts",0.161,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_precision""}",ci_low
+6.6-r2c2-2,"Table 6.6, Weighted precision of the Evaluator / Legitimate prompts",0.508,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_precision""}",ci_high
+6.6-r3c1-0,"Table 6.6, Weighted recall of the Evaluator / Attack prompts",0.40,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_recall""}",value
+6.6-r3c1-1,"Table 6.6, Weighted recall of the Evaluator / Attack prompts",0.33,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_recall""}",ci_low
+6.6-r3c1-2,"Table 6.6, Weighted recall of the Evaluator / Attack prompts",0.50,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_recall""}",ci_high
+6.6-r3c2-0,"Table 6.6, Weighted recall of the Evaluator / Legitimate prompts",0.015,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_recall""}",value
+6.6-r3c2-1,"Table 6.6, Weighted recall of the Evaluator / Legitimate prompts",0.006,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_recall""}",ci_low
+6.6-r3c2-2,"Table 6.6, Weighted recall of the Evaluator / Legitimate prompts",0.053,num,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""evaluator_recall""}",ci_high
+6.6-r4c1-0,"Table 6.6, Share of answers unsafe, annotation (weighted) / Attack prompts",55.7,pct,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""share_unsafe_annotation""}",value
+6.6-r4c1-1,"Table 6.6, Share of answers unsafe, annotation (weighted) / Attack prompts",44.6,pct,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""share_unsafe_annotation""}",ci_low
+6.6-r4c1-2,"Table 6.6, Share of answers unsafe, annotation (weighted) / Attack prompts",67.5,pct,evaluator_check_invented_rule.csv,"{""run_mode"": ""attacks"", ""rule"": ""rule_as_annotated"", ""measure"": ""share_unsafe_annotation""}",ci_high
+6.6-r4c2-0,"Table 6.6, Share of answers unsafe, annotation (weighted) / Legitimate prompts",17.7,pct,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""share_unsafe_annotation""}",value
+6.6-r4c2-1,"Table 6.6, Share of answers unsafe, annotation (weighted) / Legitimate prompts",5.8,pct,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""share_unsafe_annotation""}",ci_low
+6.6-r4c2-2,"Table 6.6, Share of answers unsafe, annotation (weighted) / Legitimate prompts",33.3,pct,evaluator_check_invented_rule.csv,"{""run_mode"": ""safe"", ""rule"": ""rule_as_annotated"", ""measure"": ""share_unsafe_annotation""}",ci_high
+6.6-r5c1-0,"Table 6.6, Share of answers unsafe, Evaluator / Attack prompts",25.7,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""attacks"", ""group"": ""all""}",rate_unsafe
+6.6-r5c2-0,"Table 6.6, Share of answers unsafe, Evaluator / Legitimate prompts",0.79,pct,evaluator_tail_risk.csv,"{""victim"": ""Mistral-7B"", ""mode"": ""safe"", ""group"": ""all""}",rate_unsafe
+6.7-r1c1-0,"Table 6.7, Qwen3-14B / Attack prompts with a valid call (of 21,600)",21579,int,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",n_att
+6.7-r1c2-0,"Table 6.7, Qwen3-14B / Recall",97.9,pct,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",recall
+6.7-r1c2-1,"Table 6.7, Qwen3-14B / Recall",97.7,pct,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",recall_lo
+6.7-r1c2-2,"Table 6.7, Qwen3-14B / Recall",98.1,pct,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",recall_hi
+6.7-r1c3-0,"Table 6.7, Qwen3-14B / Legitimate prompts with a valid call (of 19,981)",19978,int,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",n_safe
+6.7-r1c4-0,"Table 6.7, Qwen3-14B / False-positive rate",0.03,pct,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",fpr
+6.7-r1c4-1,"Table 6.7, Qwen3-14B / False-positive rate",0.01,pct,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",fpr_lo
+6.7-r1c4-2,"Table 6.7, Qwen3-14B / False-positive rate",0.06,pct,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",fpr_hi
+6.7-r1c4-3,"Table 6.7, Qwen3-14B / False-positive rate",5,int,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",fp
+6.7-r1c5-0,"Table 6.7, Qwen3-14B / Precision",0.9998,num,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",precision
+6.7-r1c6-0,"Table 6.7, Qwen3-14B / F₁",0.989,num,investigator_summary.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision""}",f1
+6.7-r1c7-0,"Table 6.7, Qwen3-14B / AUC of the score",0.990,num,investigator_score_auc.csv,"{""judge"": ""Qwen3-14B""}",auc_score
+6.7-r2c1-0,"Table 6.7, Gemma-3-12B / Attack prompts with a valid call (of 21,600)",21281,int,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",n_att
+6.7-r2c2-0,"Table 6.7, Gemma-3-12B / Recall",100.0,pct,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",recall
+6.7-r2c2-1,"Table 6.7, Gemma-3-12B / Recall",99.97,pct,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",recall_lo
+6.7-r2c2-2,"Table 6.7, Gemma-3-12B / Recall",100,pct,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",recall_hi
+6.7-r2c3-0,"Table 6.7, Gemma-3-12B / Legitimate prompts with a valid call (of 19,981)",19956,int,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",n_safe
+6.7-r2c4-0,"Table 6.7, Gemma-3-12B / False-positive rate",2.85,pct,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",fpr
+6.7-r2c4-1,"Table 6.7, Gemma-3-12B / False-positive rate",2.63,pct,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",fpr_lo
+6.7-r2c4-2,"Table 6.7, Gemma-3-12B / False-positive rate",3.09,pct,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",fpr_hi
+6.7-r2c4-3,"Table 6.7, Gemma-3-12B / False-positive rate",569,int,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",fp
+6.7-r2c5-0,"Table 6.7, Gemma-3-12B / Precision",0.974,num,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",precision
+6.7-r2c6-0,"Table 6.7, Gemma-3-12B / F₁",0.987,num,investigator_summary.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision""}",f1
+6.7-r2c7-0,"Table 6.7, Gemma-3-12B / AUC of the score",0.999,num,investigator_score_auc.csv,"{""judge"": ""Gemma-3-12B""}",auc_score
+6.7-r3c1-0,"Table 6.7, Ministral-8B / Attack prompts with a valid call (of 21,600)",21592,int,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",n_att
+6.7-r3c2-0,"Table 6.7, Ministral-8B / Recall",80.1,pct,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",recall
+6.7-r3c2-1,"Table 6.7, Ministral-8B / Recall",79.5,pct,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",recall_lo
+6.7-r3c2-2,"Table 6.7, Ministral-8B / Recall",80.6,pct,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",recall_hi
+6.7-r3c3-0,"Table 6.7, Ministral-8B / Legitimate prompts with a valid call (of 19,981)",19981,int,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",n_safe
+6.7-r3c4-0,"Table 6.7, Ministral-8B / False-positive rate",0.03,pct,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",fpr
+6.7-r3c4-1,"Table 6.7, Ministral-8B / False-positive rate",0.01,pct,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",fpr_lo
+6.7-r3c4-2,"Table 6.7, Ministral-8B / False-positive rate",0.07,pct,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",fpr_hi
+6.7-r3c4-3,"Table 6.7, Ministral-8B / False-positive rate",6,int,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",fp
+6.7-r3c5-0,"Table 6.7, Ministral-8B / Precision",0.9997,num,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",precision
+6.7-r3c6-0,"Table 6.7, Ministral-8B / F₁",0.889,num,investigator_summary.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision""}",f1
+6.7-r3c7-0,"Table 6.7, Ministral-8B / AUC of the score",0.928,num,investigator_score_auc.csv,"{""judge"": ""Ministral-8B""}",auc_score
+6.7-r4c1-0,"Table 6.7, Llama-3.1-8B / Attack prompts with a valid call (of 21,600)",21593,int,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",n_att
+6.7-r4c2-0,"Table 6.7, Llama-3.1-8B / Recall",95.4,pct,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",recall
+6.7-r4c2-1,"Table 6.7, Llama-3.1-8B / Recall",95.1,pct,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",recall_lo
+6.7-r4c2-2,"Table 6.7, Llama-3.1-8B / Recall",95.7,pct,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",recall_hi
+6.7-r4c3-0,"Table 6.7, Llama-3.1-8B / Legitimate prompts with a valid call (of 19,981)",19952,int,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",n_safe
+6.7-r4c4-0,"Table 6.7, Llama-3.1-8B / False-positive rate",3.16,pct,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",fpr
+6.7-r4c4-1,"Table 6.7, Llama-3.1-8B / False-positive rate",2.92,pct,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",fpr_lo
+6.7-r4c4-2,"Table 6.7, Llama-3.1-8B / False-positive rate",3.41,pct,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",fpr_hi
+6.7-r4c4-3,"Table 6.7, Llama-3.1-8B / False-positive rate",630,int,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",fp
+6.7-r4c5-0,"Table 6.7, Llama-3.1-8B / Precision",0.970,num,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",precision
+6.7-r4c6-0,"Table 6.7, Llama-3.1-8B / F₁",0.962,num,investigator_summary.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision""}",f1
+6.7-r4c7-0,"Table 6.7, Llama-3.1-8B / AUC of the score",0.971,num,investigator_score_auc.csv,"{""judge"": ""Llama-3.1-8B""}",auc_score
+6.7-r5c1-0,"Table 6.7, Phi-4-reasoning / Attack prompts with a valid call (of 21,600)",21404,int,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",n_att
+6.7-r5c2-0,"Table 6.7, Phi-4-reasoning / Recall",100.0,pct,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",recall
+6.7-r5c2-1,"Table 6.7, Phi-4-reasoning / Recall",99.98,pct,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",recall_lo
+6.7-r5c2-2,"Table 6.7, Phi-4-reasoning / Recall",100,pct,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",recall_hi
+6.7-r5c3-0,"Table 6.7, Phi-4-reasoning / Legitimate prompts with a valid call (of 19,981)",19975,int,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",n_safe
+6.7-r5c4-0,"Table 6.7, Phi-4-reasoning / False-positive rate",23.0,pct,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",fpr
+6.7-r5c4-1,"Table 6.7, Phi-4-reasoning / False-positive rate",22.4,pct,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",fpr_lo
+6.7-r5c4-2,"Table 6.7, Phi-4-reasoning / False-positive rate",23.6,pct,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",fpr_hi
+6.7-r5c4-3,"Table 6.7, Phi-4-reasoning / False-positive rate",4592,int,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",fp
+6.7-r5c5-0,"Table 6.7, Phi-4-reasoning / Precision",0.823,num,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",precision
+6.7-r5c6-0,"Table 6.7, Phi-4-reasoning / F₁",0.903,num,investigator_summary.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision""}",f1
+6.7-r5c7-0,"Table 6.7, Phi-4-reasoning / AUC of the score",0.966,num,investigator_score_auc.csv,"{""judge"": ""Phi-4-reasoning""}",auc_score
+6.8-r1c1-0,"Table 6.8, Qwen3-14B / Standard prompts",0.03,pct,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",fpr
+6.8-r1c1-1,"Table 6.8, Qwen3-14B / Standard prompts",0.01,pct,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",lo
+6.8-r1c1-2,"Table 6.8, Qwen3-14B / Standard prompts",0.07,pct,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",hi
+6.8-r1c1-3,"Table 6.8, Qwen3-14B / Standard prompts",4,int,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",fp
+6.8-r1c1-4,"Table 6.8, Qwen3-14B / Standard prompts",15733,int,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",n
+6.8-r1c2-0,"Table 6.8, Qwen3-14B / Prompts written to resemble attacks",0.02,pct,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",fpr
+6.8-r1c2-1,"Table 6.8, Qwen3-14B / Prompts written to resemble attacks",0.00,pct,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",lo
+6.8-r1c2-2,"Table 6.8, Qwen3-14B / Prompts written to resemble attacks",0.13,pct,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",hi
+6.8-r1c2-3,"Table 6.8, Qwen3-14B / Prompts written to resemble attacks",1,int,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",fp
+6.8-r1c2-4,"Table 6.8, Qwen3-14B / Prompts written to resemble attacks",4245,int,investigator_fp_by_kind.csv,"{""judge"": ""Qwen3-14B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",n
+6.8-r2c1-0,"Table 6.8, Gemma-3-12B / Standard prompts",2.53,pct,investigator_fp_by_kind.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",fpr
+6.8-r2c1-1,"Table 6.8, Gemma-3-12B / Standard prompts",2.29,pct,investigator_fp_by_kind.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",lo
+6.8-r2c1-2,"Table 6.8, Gemma-3-12B / Standard prompts",2.78,pct,investigator_fp_by_kind.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",hi
+6.8-r2c2-0,"Table 6.8, Gemma-3-12B / Prompts written to resemble attacks",4.06,pct,investigator_fp_by_kind.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",fpr
+6.8-r2c2-1,"Table 6.8, Gemma-3-12B / Prompts written to resemble attacks",3.50,pct,investigator_fp_by_kind.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",lo
+6.8-r2c2-2,"Table 6.8, Gemma-3-12B / Prompts written to resemble attacks",4.69,pct,investigator_fp_by_kind.csv,"{""judge"": ""Gemma-3-12B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",hi
+6.8-r3c1-0,"Table 6.8, Ministral-8B / Standard prompts",0.01,pct,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",fpr
+6.8-r3c1-1,"Table 6.8, Ministral-8B / Standard prompts",0.00,pct,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",lo
+6.8-r3c1-2,"Table 6.8, Ministral-8B / Standard prompts",0.05,pct,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",hi
+6.8-r3c1-3,"Table 6.8, Ministral-8B / Standard prompts",2,int,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",fp
+6.8-r3c1-4,"Table 6.8, Ministral-8B / Standard prompts",15734,int,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",n
+6.8-r3c2-0,"Table 6.8, Ministral-8B / Prompts written to resemble attacks",0.09,pct,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",fpr
+6.8-r3c2-1,"Table 6.8, Ministral-8B / Prompts written to resemble attacks",0.04,pct,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",lo
+6.8-r3c2-2,"Table 6.8, Ministral-8B / Prompts written to resemble attacks",0.24,pct,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",hi
+6.8-r3c2-3,"Table 6.8, Ministral-8B / Prompts written to resemble attacks",4,int,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",fp
+6.8-r3c2-4,"Table 6.8, Ministral-8B / Prompts written to resemble attacks",4247,int,investigator_fp_by_kind.csv,"{""judge"": ""Ministral-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",n
+6.8-r4c1-0,"Table 6.8, Llama-3.1-8B / Standard prompts",3.15,pct,investigator_fp_by_kind.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",fpr
+6.8-r4c1-1,"Table 6.8, Llama-3.1-8B / Standard prompts",2.89,pct,investigator_fp_by_kind.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",lo
+6.8-r4c1-2,"Table 6.8, Llama-3.1-8B / Standard prompts",3.44,pct,investigator_fp_by_kind.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",hi
+6.8-r4c2-0,"Table 6.8, Llama-3.1-8B / Prompts written to resemble attacks",3.18,pct,investigator_fp_by_kind.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",fpr
+6.8-r4c2-1,"Table 6.8, Llama-3.1-8B / Prompts written to resemble attacks",2.70,pct,investigator_fp_by_kind.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",lo
+6.8-r4c2-2,"Table 6.8, Llama-3.1-8B / Prompts written to resemble attacks",3.76,pct,investigator_fp_by_kind.csv,"{""judge"": ""Llama-3.1-8B"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",hi
+6.8-r5c1-0,"Table 6.8, Phi-4-reasoning / Standard prompts",22.1,pct,investigator_fp_by_kind.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",fpr
+6.8-r5c1-1,"Table 6.8, Phi-4-reasoning / Standard prompts",21.4,pct,investigator_fp_by_kind.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",lo
+6.8-r5c1-2,"Table 6.8, Phi-4-reasoning / Standard prompts",22.7,pct,investigator_fp_by_kind.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision"", ""safe_kind"": ""standard""}",hi
+6.8-r5c2-0,"Table 6.8, Phi-4-reasoning / Prompts written to resemble attacks",26.4,pct,investigator_fp_by_kind.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",fpr
+6.8-r5c2-1,"Table 6.8, Phi-4-reasoning / Prompts written to resemble attacks",25.1,pct,investigator_fp_by_kind.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",lo
+6.8-r5c2-2,"Table 6.8, Phi-4-reasoning / Prompts written to resemble attacks",27.7,pct,investigator_fp_by_kind.csv,"{""judge"": ""Phi-4-reasoning"", ""rule"": ""decision"", ""safe_kind"": ""hard_negative""}",hi
+B.8-r1c1-0,"Table B.8, Qwen3-14B / HarmBench",98.3,pct,investigator_recall_by_source.csv,"{""judge"": ""Qwen3-14B"", ""source"": ""HarmBench""}",recall
+B.8-r1c2-0,"Table B.8, Qwen3-14B / JailbreakDB-style",97.4,pct,investigator_recall_by_source.csv,"{""judge"": ""Qwen3-14B"", ""source"": ""JailbreakDB""}",recall
+B.8-r1c3-0,"Table B.8, Qwen3-14B / WildJailbreak",98.1,pct,investigator_recall_by_source.csv,"{""judge"": ""Qwen3-14B"", ""source"": ""WildJailbreak""}",recall
+B.8-r2c1-0,"Table B.8, Gemma-3-12B / HarmBench",100.0,pct,investigator_recall_by_source.csv,"{""judge"": ""Gemma-3-12B"", ""source"": ""HarmBench""}",recall
+B.8-r2c2-0,"Table B.8, Gemma-3-12B / JailbreakDB-style",100.0,pct,investigator_recall_by_source.csv,"{""judge"": ""Gemma-3-12B"", ""source"": ""JailbreakDB""}",recall
+B.8-r2c3-0,"Table B.8, Gemma-3-12B / WildJailbreak",99.99,pct,investigator_recall_by_source.csv,"{""judge"": ""Gemma-3-12B"", ""source"": ""WildJailbreak""}",recall
+B.8-r3c1-0,"Table B.8, Ministral-8B / HarmBench",75.0,pct,investigator_recall_by_source.csv,"{""judge"": ""Ministral-8B"", ""source"": ""HarmBench""}",recall
+B.8-r3c2-0,"Table B.8, Ministral-8B / JailbreakDB-style",91.3,pct,investigator_recall_by_source.csv,"{""judge"": ""Ministral-8B"", ""source"": ""JailbreakDB""}",recall
+B.8-r3c3-0,"Table B.8, Ministral-8B / WildJailbreak",73.9,pct,investigator_recall_by_source.csv,"{""judge"": ""Ministral-8B"", ""source"": ""WildJailbreak""}",recall
+B.8-r4c1-0,"Table B.8, Llama-3.1-8B / HarmBench",96.4,pct,investigator_recall_by_source.csv,"{""judge"": ""Llama-3.1-8B"", ""source"": ""HarmBench""}",recall
+B.8-r4c2-0,"Table B.8, Llama-3.1-8B / JailbreakDB-style",96.0,pct,investigator_recall_by_source.csv,"{""judge"": ""Llama-3.1-8B"", ""source"": ""JailbreakDB""}",recall
+B.8-r4c3-0,"Table B.8, Llama-3.1-8B / WildJailbreak",93.9,pct,investigator_recall_by_source.csv,"{""judge"": ""Llama-3.1-8B"", ""source"": ""WildJailbreak""}",recall
+B.8-r5c1-0,"Table B.8, Phi-4-reasoning / HarmBench",100.0,pct,investigator_recall_by_source.csv,"{""judge"": ""Phi-4-reasoning"", ""source"": ""HarmBench""}",recall
+B.8-r5c2-0,"Table B.8, Phi-4-reasoning / JailbreakDB-style",100.0,pct,investigator_recall_by_source.csv,"{""judge"": ""Phi-4-reasoning"", ""source"": ""JailbreakDB""}",recall
+B.8-r5c3-0,"Table B.8, Phi-4-reasoning / WildJailbreak",100.0,pct,investigator_recall_by_source.csv,"{""judge"": ""Phi-4-reasoning"", ""source"": ""WildJailbreak""}",recall
+6.11-r1c2-0,"Table 6.11, 0 / Mean Consistency (cosine)",0.975,num,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""attacks""}",consistency_mean
+6.11-r1c3-0,"Table 6.11, 0 / Pools with Consistency ≥ 0.9",96.2,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""attacks""}",consistency_ge_0_9
+6.11-r1c4-0,"Table 6.11, 0 / Pools with 20 identical answers",17.0,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""attacks""}",all_replays_identical
+6.11-r1c5-0,"Table 6.11, 0 / Answers judged unsafe",22.5,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""attacks""}",unsafe_per_replay
+6.11-r1c6-0,"Table 6.11, 0 / Pools with at least one unsafe answer in 20",29.1,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""attacks""}",any_unsafe_rate
+6.11-r1c6-1,"Table 6.11, 0 / Pools with at least one unsafe answer in 20",25.4,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""attacks""}",any_unsafe_lo
+6.11-r1c6-2,"Table 6.11, 0 / Pools with at least one unsafe answer in 20",33.2,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""attacks""}",any_unsafe_hi
+6.11-r2c2-0,"Table 6.11, 0.2 / Mean Consistency (cosine)",0.886,num,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""attacks""}",consistency_mean
+6.11-r2c3-0,"Table 6.11, 0.2 / Pools with Consistency ≥ 0.9",40.4,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""attacks""}",consistency_ge_0_9
+6.11-r2c4-0,"Table 6.11, 0.2 / Pools with 20 identical answers",0.8,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""attacks""}",all_replays_identical
+6.11-r2c5-0,"Table 6.11, 0.2 / Answers judged unsafe",24.5,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""attacks""}",unsafe_per_replay
+6.11-r2c6-0,"Table 6.11, 0.2 / Pools with at least one unsafe answer in 20",58.2,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""attacks""}",any_unsafe_rate
+6.11-r2c6-1,"Table 6.11, 0.2 / Pools with at least one unsafe answer in 20",54.0,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""attacks""}",any_unsafe_lo
+6.11-r2c6-2,"Table 6.11, 0.2 / Pools with at least one unsafe answer in 20",62.4,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""attacks""}",any_unsafe_hi
+6.11-r3c2-0,"Table 6.11, 0.7 / Mean Consistency (cosine)",0.848,num,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""attacks""}",consistency_mean
+6.11-r3c3-0,"Table 6.11, 0.7 / Pools with Consistency ≥ 0.9",15.7,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""attacks""}",consistency_ge_0_9
+6.11-r3c4-0,"Table 6.11, 0.7 / Pools with 20 identical answers",0,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""attacks""}",all_replays_identical
+6.11-r3c5-0,"Table 6.11, 0.7 / Answers judged unsafe",25.6,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""attacks""}",unsafe_per_replay
+6.11-r3c6-0,"Table 6.11, 0.7 / Pools with at least one unsafe answer in 20",69.7,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""attacks""}",any_unsafe_rate
+6.11-r3c6-1,"Table 6.11, 0.7 / Pools with at least one unsafe answer in 20",65.7,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""attacks""}",any_unsafe_lo
+6.11-r3c6-2,"Table 6.11, 0.7 / Pools with at least one unsafe answer in 20",73.5,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""attacks""}",any_unsafe_hi
+6.11-r4c2-0,"Table 6.11, 1.0 / Mean Consistency (cosine)",0.832,num,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""attacks""}",consistency_mean
+6.11-r4c3-0,"Table 6.11, 1.0 / Pools with Consistency ≥ 0.9",9.4,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""attacks""}",consistency_ge_0_9
+6.11-r4c4-0,"Table 6.11, 1.0 / Pools with 20 identical answers",0,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""attacks""}",all_replays_identical
+6.11-r4c5-0,"Table 6.11, 1.0 / Answers judged unsafe",25.1,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""attacks""}",unsafe_per_replay
+6.11-r4c6-0,"Table 6.11, 1.0 / Pools with at least one unsafe answer in 20",73.0,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""attacks""}",any_unsafe_rate
+6.11-r4c6-1,"Table 6.11, 1.0 / Pools with at least one unsafe answer in 20",69.0,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""attacks""}",any_unsafe_lo
+6.11-r4c6-2,"Table 6.11, 1.0 / Pools with at least one unsafe answer in 20",76.6,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""attacks""}",any_unsafe_hi
+6.11-r5c2-0,"Table 6.11, 0 / Mean Consistency (cosine)",0.988,num,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""safe""}",consistency_mean
+6.11-r5c3-0,"Table 6.11, 0 / Pools with Consistency ≥ 0.9",100,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""safe""}",consistency_ge_0_9
+6.11-r5c4-0,"Table 6.11, 0 / Pools with 20 identical answers",14.9,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""safe""}",all_replays_identical
+6.11-r5c5-0,"Table 6.11, 0 / Answers judged unsafe",0.73,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""safe""}",unsafe_per_replay
+6.11-r5c6-0,"Table 6.11, 0 / Pools with at least one unsafe answer in 20",1.0,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""safe""}",any_unsafe_rate
+6.11-r5c6-1,"Table 6.11, 0 / Pools with at least one unsafe answer in 20",0.4,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""safe""}",any_unsafe_lo
+6.11-r5c6-2,"Table 6.11, 0 / Pools with at least one unsafe answer in 20",2.4,pct,sensitivity_temperature.csv,"{""temperature"": 0.0, ""run_mode"": ""safe""}",any_unsafe_hi
+6.11-r6c2-0,"Table 6.11, 0.2 / Mean Consistency (cosine)",0.948,num,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""safe""}",consistency_mean
+6.11-r6c3-0,"Table 6.11, 0.2 / Pools with Consistency ≥ 0.9",92.7,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""safe""}",consistency_ge_0_9
+6.11-r6c4-0,"Table 6.11, 0.2 / Pools with 20 identical answers",0.4,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""safe""}",all_replays_identical
+6.11-r6c5-0,"Table 6.11, 0.2 / Answers judged unsafe",0.79,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""safe""}",unsafe_per_replay
+6.11-r6c6-0,"Table 6.11, 0.2 / Pools with at least one unsafe answer in 20",3.1,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""safe""}",any_unsafe_rate
+6.11-r6c6-1,"Table 6.11, 0.2 / Pools with at least one unsafe answer in 20",1.9,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""safe""}",any_unsafe_lo
+6.11-r6c6-2,"Table 6.11, 0.2 / Pools with at least one unsafe answer in 20",5.1,pct,sensitivity_temperature.csv,"{""temperature"": 0.2, ""run_mode"": ""safe""}",any_unsafe_hi
+6.11-r7c2-0,"Table 6.11, 0.7 / Mean Consistency (cosine)",0.926,num,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""safe""}",consistency_mean
+6.11-r7c3-0,"Table 6.11, 0.7 / Pools with Consistency ≥ 0.9",82.0,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""safe""}",consistency_ge_0_9
+6.11-r7c4-0,"Table 6.11, 0.7 / Pools with 20 identical answers",0,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""safe""}",all_replays_identical
+6.11-r7c5-0,"Table 6.11, 0.7 / Answers judged unsafe",0.84,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""safe""}",unsafe_per_replay
+6.11-r7c6-0,"Table 6.11, 0.7 / Pools with at least one unsafe answer in 20",6.1,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""safe""}",any_unsafe_rate
+6.11-r7c6-1,"Table 6.11, 0.7 / Pools with at least one unsafe answer in 20",4.3,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""safe""}",any_unsafe_lo
+6.11-r7c6-2,"Table 6.11, 0.7 / Pools with at least one unsafe answer in 20",8.6,pct,sensitivity_temperature.csv,"{""temperature"": 0.7, ""run_mode"": ""safe""}",any_unsafe_hi
+6.11-r8c2-0,"Table 6.11, 1.0 / Mean Consistency (cosine)",0.916,num,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""safe""}",consistency_mean
+6.11-r8c3-0,"Table 6.11, 1.0 / Pools with Consistency ≥ 0.9",73.6,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""safe""}",consistency_ge_0_9
+6.11-r8c4-0,"Table 6.11, 1.0 / Pools with 20 identical answers",0,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""safe""}",all_replays_identical
+6.11-r8c5-0,"Table 6.11, 1.0 / Answers judged unsafe",1.00,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""safe""}",unsafe_per_replay
+6.11-r8c6-0,"Table 6.11, 1.0 / Pools with at least one unsafe answer in 20",6.3,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""safe""}",any_unsafe_rate
+6.11-r8c6-1,"Table 6.11, 1.0 / Pools with at least one unsafe answer in 20",4.4,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""safe""}",any_unsafe_lo
+6.11-r8c6-2,"Table 6.11, 1.0 / Pools with at least one unsafe answer in 20",8.8,pct,sensitivity_temperature.csv,"{""temperature"": 1.0, ""run_mode"": ""safe""}",any_unsafe_hi
+B.9-r1c1-0,"Table B.9, Attack / Prompts",522,int,sensitivity_seed.csv,"{""run_mode"": ""attacks""}",prompts
+B.9-r1c2-0,"Table B.9, Attack / Replays compared",5220,int,sensitivity_seed.csv,"{""run_mode"": ""attacks""}",replays_compared
+B.9-r1c3-0,"Table B.9, Attack / Identical texts",1037,int,sensitivity_seed.csv,"{""run_mode"": ""attacks""}",identical
+B.9-r1c4-0,"Table B.9, Attack / Share identical (bootstrap 95% interval)",19.9,pct,sensitivity_seed.csv,"{""run_mode"": ""attacks""}",identical_rate
+B.9-r1c4-1,"Table B.9, Attack / Share identical (bootstrap 95% interval)",18.1,pct,sensitivity_seed.csv,"{""run_mode"": ""attacks""}",lo_bootstrap
+B.9-r1c4-2,"Table B.9, Attack / Share identical (bootstrap 95% interval)",21.6,pct,sensitivity_seed.csv,"{""run_mode"": ""attacks""}",hi_bootstrap
+B.9-r1c5-0,"Table B.9, Attack / Pools with all 10 identical",1.0,pct,sensitivity_seed.csv,"{""run_mode"": ""attacks""}",pools_all_identical
+B.9-r2c1-0,"Table B.9, Legitimate / Prompts",478,int,sensitivity_seed.csv,"{""run_mode"": ""safe""}",prompts
+B.9-r2c2-0,"Table B.9, Legitimate / Replays compared",4780,int,sensitivity_seed.csv,"{""run_mode"": ""safe""}",replays_compared
+B.9-r2c3-0,"Table B.9, Legitimate / Identical texts",1134,int,sensitivity_seed.csv,"{""run_mode"": ""safe""}",identical
+B.9-r2c4-0,"Table B.9, Legitimate / Share identical (bootstrap 95% interval)",23.7,pct,sensitivity_seed.csv,"{""run_mode"": ""safe""}",identical_rate
+B.9-r2c4-1,"Table B.9, Legitimate / Share identical (bootstrap 95% interval)",21.7,pct,sensitivity_seed.csv,"{""run_mode"": ""safe""}",lo_bootstrap
+B.9-r2c4-2,"Table B.9, Legitimate / Share identical (bootstrap 95% interval)",25.9,pct,sensitivity_seed.csv,"{""run_mode"": ""safe""}",hi_bootstrap
+B.9-r2c5-0,"Table B.9, Legitimate / Pools with all 10 identical",1.0,pct,sensitivity_seed.csv,"{""run_mode"": ""safe""}",pools_all_identical
+6.12-r1c2-0,"Table 6.12, Main runs, replay 0 / Prompts",1040,int,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",n
+6.12-r1c3-0,"Table 6.12, Main runs, replay 0 / With the answer",98.3,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",with_answer
+6.12-r1c3-1,"Table 6.12, Main runs, replay 0 / With the answer",97.3,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",with_lo
+6.12-r1c3-2,"Table 6.12, Main runs, replay 0 / With the answer",98.9,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",with_hi
+6.12-r1c4-0,"Table 6.12, Main runs, replay 0 / Without the answer",99.1,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",without_answer
+6.12-r1c4-1,"Table 6.12, Main runs, replay 0 / Without the answer",98.4,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",without_lo
+6.12-r1c4-2,"Table 6.12, Main runs, replay 0 / Without the answer",99.5,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",without_hi
+6.12-r1c5-0,"Table 6.12, Main runs, replay 0 / Only with",0,int,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",only_with_answer
+6.12-r1c6-0,"Table 6.12, Main runs, replay 0 / Only without",9,int,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""attacks""}",only_without_answer
+6.12-r2c2-0,"Table 6.12, Main runs, replay 0 / Prompts",959,int,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",n
+6.12-r2c3-0,"Table 6.12, Main runs, replay 0 / With the answer",0.0,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",with_answer
+6.12-r2c3-1,"Table 6.12, Main runs, replay 0 / With the answer",0.0,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",with_lo
+6.12-r2c3-2,"Table 6.12, Main runs, replay 0 / With the answer",0.4,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",with_hi
+6.12-r2c4-0,"Table 6.12, Main runs, replay 0 / Without the answer",0.1,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",without_answer
+6.12-r2c4-1,"Table 6.12, Main runs, replay 0 / Without the answer",0.0,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",without_lo
+6.12-r2c4-2,"Table 6.12, Main runs, replay 0 / Without the answer",0.6,pct,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",without_hi
+6.12-r2c5-0,"Table 6.12, Main runs, replay 0 / Only with",0,int,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",only_with_answer
+6.12-r2c6-0,"Table 6.12, Main runs, replay 0 / Only without",1,int,sensitivity_ablation.csv,"{""baseline"": ""main v2 runs, ablation sample"", ""run_mode"": ""safe""}",only_without_answer
+6.12-r3c2-0,"Table 6.12, Same run, temperature sample / Prompts",520,int,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",n
+6.12-r3c3-0,"Table 6.12, Same run, temperature sample / With the answer",98.7,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",with_answer
+6.12-r3c3-1,"Table 6.12, Same run, temperature sample / With the answer",97.2,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",with_lo
+6.12-r3c3-2,"Table 6.12, Same run, temperature sample / With the answer",99.3,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",with_hi
+6.12-r3c4-0,"Table 6.12, Same run, temperature sample / Without the answer",99.2,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",without_answer
+6.12-r3c4-1,"Table 6.12, Same run, temperature sample / Without the answer",98.0,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",without_lo
+6.12-r3c4-2,"Table 6.12, Same run, temperature sample / Without the answer",99.7,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",without_hi
+6.12-r3c5-0,"Table 6.12, Same run, temperature sample / Only with",0,int,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",only_with_answer
+6.12-r3c6-0,"Table 6.12, Same run, temperature sample / Only without",3,int,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""attacks""}",only_without_answer
+6.12-r4c2-0,"Table 6.12, Same run, temperature sample / Prompts",478,int,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",n
+6.12-r4c3-0,"Table 6.12, Same run, temperature sample / With the answer",0.0,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",with_answer
+6.12-r4c3-1,"Table 6.12, Same run, temperature sample / With the answer",0.0,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",with_lo
+6.12-r4c3-2,"Table 6.12, Same run, temperature sample / With the answer",0.8,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",with_hi
+6.12-r4c4-0,"Table 6.12, Same run, temperature sample / Without the answer",0.0,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",without_answer
+6.12-r4c4-1,"Table 6.12, Same run, temperature sample / Without the answer",0.0,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",without_lo
+6.12-r4c4-2,"Table 6.12, Same run, temperature sample / Without the answer",0.8,pct,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",without_hi
+6.12-r4c5-0,"Table 6.12, Same run, temperature sample / Only with",0,int,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",only_with_answer
+6.12-r4c6-0,"Table 6.12, Same run, temperature sample / Only without",0,int,sensitivity_ablation.csv,"{""baseline"": ""same run, temperature sample"", ""run_mode"": ""safe""}",only_without_answer

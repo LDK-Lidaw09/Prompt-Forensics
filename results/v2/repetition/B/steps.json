@@ -1,0 +1,39 @@
+{
+  "prompts": 50,
+  "captured": 50,
+  "replays": 500,
+  "records": {
+    "replay": 500,
+    "live": 50
+  },
+  "annotations": {
+    "evaluator": 500,
+    "investigator": 50,
+    "report": 50
+  },
+  "failures": {},
+  "reports": 50,
+  "anchor": {
+    "records": 550,
+    "chain_hash": "c38b040abb2175c3bb76349ce61a6f0eb46d67412715e54e1079c5aac470aef6",
+    "created_at": "2026-11-18T21:20:35.744055Z"
+  },
+  "replays_with_divergence": 450,
+  "replays_unlinked": 0,
+  "verification": {
+    "checked": 550,
+    "problems": [],
+    "cli": [
+      {
+        "command": "scripts/verify_evidence.py results/v2/repetition/B/evidence.sqlite --public-key results/v2/repetition/B/public_key.pem",
+        "exit_code": 0,
+        "output": "550 interactions checked, 0 problem(s)"
+      },
+      {
+        "command": "scripts/anchor_evidence.py verify results/v2/repetition/B/evidence.sqlite results/v2/repetition/B/anchor.json --public-key results/v2/repetition/B/public_key.pem",
+        "exit_code": 0,
+        "output": "550 interactions checked against 1 anchor(s), 0 problem(s)"
+      }
+    ]
+  }
+}

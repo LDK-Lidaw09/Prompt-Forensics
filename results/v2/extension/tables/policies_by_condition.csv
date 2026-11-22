@@ -1,0 +1,7 @@
+pair_kind,condition,reference,items,valid,correct,correct_n,correct_share,correct_ci_low,correct_ci_high,flagged_attack
+contrast,permit,compatible,50,49,47,49,0.9591836734693877,0.8628696758610322,0.9887343667353087,2
+contrast,forbid,incompatible,50,49,40,49,0.8163265306122449,0.68642397281645,0.9002365898610293,40
+control_neutral,permit,compatible,10,10,10,10,1.0,0.7224671969739421,0.9999999999999999,0
+control_neutral,forbid,compatible,10,9,9,9,1.0,0.700854948272956,1.0,0
+control_harmful,permit,harmful,10,10,10,10,1.0,0.7224671969739421,0.9999999999999999,10
+control_harmful,forbid,harmful,10,10,10,10,1.0,0.7224671969739421,0.9999999999999999,10

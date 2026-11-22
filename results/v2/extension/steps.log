@@ -1,0 +1,22 @@
+[2026-11-19 14:58:09] done: install
+[2026-11-19 14:58:09] backup check
+[2026-11-19 15:01:11] serving mistralai/Mistral-7B-Instruct-v0.3
+[2026-11-19 15:01:11] D: recorded answers (results/v2/extension/vllm_Mistral-7B-Instruct-v0.3_145810.log)
+[2026-11-19 15:02:02] done: D_record
+[2026-11-19 15:02:52] serving mistralai/Mistral-7B-Instruct-v0.3
+[2026-11-19 15:02:52] D: 20 replays per prompt (results/v2/extension/vllm_Mistral-7B-Instruct-v0.3_150202.log)
+[2026-11-19 15:13:42] C: answers of the victim
+[2026-11-19 15:13:53] B2: capture and replays
+[2026-11-19 15:15:42] done: victim2
+[2026-11-19 15:19:23] serving Qwen/Qwen3-14B
+[2026-11-19 15:19:23] D: evaluator
+[2026-11-19 15:26:05] C: investigator
+[2026-11-19 15:26:35] B2: evaluator and investigator
+[2026-11-19 15:28:23] done: judge
+[2026-11-19 15:28:23] B2: reports, anchor, verification, alterations
+[2026-11-19 15:28:30] done: B2_finish
+[2026-11-19 15:28:30] D: similarity scores
+[2026-11-19 17:25:36] backup check
+[2026-11-19 17:25:38] D: similarity scores
+[2026-11-19 17:28:46] done: D_score
+[2026-11-19 17:28:50] finished: results/v2/extension.tar.gz
