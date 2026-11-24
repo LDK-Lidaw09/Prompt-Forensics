@@ -91,7 +91,7 @@ Python 3.10 or newer.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[ml,ui,datagen,dev]"   # or: pip install -r requirements.txt
+pip install -e ".[ml,ui,datagen,analysis,dev]"   # or: pip install -r requirements.txt
 cp .env.example .env               # then edit the model endpoints
 ```
 

@@ -8,18 +8,21 @@ false-positive rate of an Investigator say about the analysis of an interaction.
 A second analysis leaves the attack prompts of one source collection out of the fitting
 and tests on that source, to see whether the separation rests on templates seen in fitting.
 
+The Wilson intervals treat prompts as independent; prompts of the same document are not,
+so the intervals are narrower than intervals clustered by document would be.
+
 Output: results/v2/tables/lexical_baseline.csv
+Requirements: pip install -e ".[analysis]"
 Usage: python3 scripts/analysis_v2/lexical_baseline.py
 """
 import glob
 import json
+import os
+import tempfile
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "results/v2/tables/lexical_baseline.csv"
@@ -40,6 +43,9 @@ def load():
 
 
 def wilson(k, n, z=1.959964):
+    """Rate k/n with its Wilson 95% interval; (nan, nan, nan) for an empty group."""
+    if n == 0:
+        return float("nan"), float("nan"), float("nan")
     p = k / n
     den = 1 + z * z / n
     c = (p + z * z / (2 * n)) / den
@@ -48,6 +54,9 @@ def wilson(k, n, z=1.959964):
 
 
 def evaluate(name, vec, d):
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
+
     dev, test = d[d.split == "dev"], d[d.split == "test"].copy()
     X = vec.fit_transform(dev.text)
     clf = LogisticRegression(max_iter=2000, C=1.0, random_state=SEED).fit(X, dev.y)
@@ -79,6 +88,9 @@ def evaluate(name, vec, d):
 
 def cross_source(d):
     """Word model fitted without the attack prompts of one source, tested on that source."""
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.linear_model import LogisticRegression
+
     out = []
     dev, test = d[d.split == "dev"], d[d.split == "test"]
     for held in sorted(d[d.y == 1].source.unique()):
@@ -97,7 +109,22 @@ def cross_source(d):
     return out
 
 
+def write_csv(t, out):
+    """Write the table to a temporary file, then replace the published file in one step."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=out.parent, suffix=".csv.tmp")
+    try:
+        with os.fdopen(fd, "w", newline="") as f:
+            t.to_csv(f, index=False)
+        os.replace(tmp, out)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
 def main():
+    from sklearn.feature_extraction.text import TfidfVectorizer
+
     d = load()
     assert (d.y == 1).sum() == 21600 and (d.y == 0).sum() == 19981, d.y.value_counts()
     res = []
@@ -106,8 +133,7 @@ def main():
                                                            sublinear_tf=True), d)
     res += cross_source(d)
     t = pd.DataFrame(res)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    t.to_csv(OUT, index=False)
+    write_csv(t, OUT)
     print(t.to_string(index=False))
 
 
