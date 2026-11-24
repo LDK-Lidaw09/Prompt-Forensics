@@ -32,6 +32,8 @@ ml = [
     "bert-score>=0.3.13",
     "torch>=2.1",
 ]
+# Lexical baseline on the prompt text (scripts/analysis_v2/lexical_baseline.py).
+analysis = ["scikit-learn>=1.3"]
 # Demo interface (thesis 4.5).
 ui = ["streamlit>=1.46"]
 dev = ["pytest>=8"]
