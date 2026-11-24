@@ -1,0 +1,25 @@
+features,group,n,measure,flagged,rate,lo,hi
+word 1-2 grams,"attack, test",18383,recall,18383.0,1.0,0.9998,1.0
+word 1-2 grams,"attack, test, text not in dev",17879,recall,17879.0,1.0,0.9998,1.0
+word 1-2 grams,"attack, test, HarmBench",6148,recall,6148.0,1.0,0.9994,1.0
+word 1-2 grams,"attack, test, JailbreakDB",6117,recall,6117.0,1.0,0.9994,1.0
+word 1-2 grams,"attack, test, WildJailbreak",6118,recall,6118.0,1.0,0.9994,1.0
+word 1-2 grams,"legitimate, test",16984,false_positive_rate,0.0,0.0,0.0,0.0002
+word 1-2 grams,"legitimate, test, hard_negative",3630,false_positive_rate,0.0,0.0,0.0,0.0011
+word 1-2 grams,"legitimate, test, standard",13354,false_positive_rate,0.0,0.0,0.0,0.0003
+word 1-2 grams,"all, test",35367,auc,,1.0,,
+character 3-5 grams,"attack, test",18383,recall,18382.0,0.9999,0.9997,1.0
+character 3-5 grams,"attack, test, text not in dev",17879,recall,17878.0,0.9999,0.9997,1.0
+character 3-5 grams,"attack, test, HarmBench",6148,recall,6147.0,0.9998,0.9991,1.0
+character 3-5 grams,"attack, test, JailbreakDB",6117,recall,6117.0,1.0,0.9994,1.0
+character 3-5 grams,"attack, test, WildJailbreak",6118,recall,6118.0,1.0,0.9994,1.0
+character 3-5 grams,"legitimate, test",16984,false_positive_rate,2.0,0.0001,0.0,0.0004
+character 3-5 grams,"legitimate, test, hard_negative",3630,false_positive_rate,0.0,0.0,0.0,0.0011
+character 3-5 grams,"legitimate, test, standard",13354,false_positive_rate,2.0,0.0001,0.0,0.0005
+character 3-5 grams,"all, test",35367,auc,,1.0,,
+"word 1-2 grams, source left out","attack, test, HarmBench (source left out)",6148,recall,2384.0,0.3878,0.3757,0.4
+"word 1-2 grams, source left out","legitimate, test (HarmBench left out)",16984,false_positive_rate,0.0,0.0,0.0,0.0002
+"word 1-2 grams, source left out","attack, test, JailbreakDB (source left out)",6117,recall,4155.0,0.6793,0.6674,0.6908
+"word 1-2 grams, source left out","legitimate, test (JailbreakDB left out)",16984,false_positive_rate,0.0,0.0,0.0,0.0002
+"word 1-2 grams, source left out","attack, test, WildJailbreak (source left out)",6118,recall,4208.0,0.6878,0.6761,0.6993
+"word 1-2 grams, source left out","legitimate, test (WildJailbreak left out)",16984,false_positive_rate,0.0,0.0,0.0,0.0002
