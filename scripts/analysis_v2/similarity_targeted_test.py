@@ -40,7 +40,7 @@ for sid,g in a.groupby('sid'):
         real.append(dict(mode='attacks',sid=sid,kind='real_safe_vs_malicious',a=s.text.iloc[0],b=m.text.iloc[0]))
         if len(s)>1: real.append(dict(mode='attacks',sid=sid,kind='real_safe_vs_safe',a=s.text.iloc[0],b=s.text.iloc[1]))
 P=pd.DataFrame(pairs+real)
-gte=SentenceTransformer('Alibaba-NLP/gte-large-en-v1.5',trust_remote_code=True,device='cpu')
+gte=SentenceTransformer('Alibaba-NLP/gte-large-en-v1.5',revision='104333d6af6f97649377c2afbde10a7704870c7b',trust_remote_code=True,device='cpu')
 ea=gte.encode(list(P.a),normalize_embeddings=True,batch_size=8); eb=gte.encode(list(P.b),normalize_embeddings=True,batch_size=8)
 P['cos']=(ea*eb).sum(1)
 bs=BERTScorer(lang='en',rescale_with_baseline=False,device='cpu')
