@@ -126,7 +126,8 @@ def get_settings() -> Settings:
         live_max_tokens=_env_int("LIVE_MAX_TOKENS", 512),
         seed_base=_env_int("LIVE_SEED", 1234),
         embed_model_name=_env_str("EMBED_MODEL_NAME", "Alibaba-NLP/gte-large-en-v1.5"),
-        embed_model_revision=_env_str("EMBED_MODEL_REVISION", "104333d6af6f97649377c2afbde10a7704870c7b"),
+        # Unlike the other settings, an explicitly empty value is kept (latest revision).
+        embed_model_revision=os.getenv("EMBED_MODEL_REVISION", "104333d6af6f97649377c2afbde10a7704870c7b").strip(),
         embed_device=_env_str("EMBED_DEVICE", "cpu"),
         # Batch size 1 is what produced the thesis numbers. Larger batches are
         # faster but padding can change the last decimals of the embeddings.

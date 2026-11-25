@@ -24,6 +24,13 @@ from ..config import get_settings
 THESIS_EMBED_MODEL = "Alibaba-NLP/gte-large-en-v1.5"
 
 
+def embed_revision(model_name: str | None = None) -> str | None:
+    """Hub revision loaded for ``model_name`` (default: the configured model); None means latest."""
+    settings = get_settings()
+    name = model_name or settings.embed_model_name
+    return (settings.embed_model_revision or None) if name == THESIS_EMBED_MODEL else None
+
+
 @lru_cache(maxsize=2)
 def get_embedder(model_name: str | None = None, device: str | None = None):
     """Load (once) and return the sentence-transformers model."""
@@ -35,7 +42,7 @@ def get_embedder(model_name: str | None = None, device: str | None = None):
         name,
         # The pinned revision belongs to the thesis model; any other model or a
         # local folder is loaded as given.
-        revision=(settings.embed_model_revision or None) if name == THESIS_EMBED_MODEL else None,
+        revision=embed_revision(name),
         # gte-large-en-v1.5 ships custom modelling code on the Hugging Face Hub.
         trust_remote_code=True,
         device=device or settings.embed_device,

@@ -43,6 +43,7 @@ from prompt_forensics.datagen.generator import (  # noqa: E402
 )
 from prompt_forensics.datagen.pipeline import GenerationConfig, GenerationRun, _read_jsonl  # noqa: E402
 from prompt_forensics.datagen.taxonomy import sample_slot  # noqa: E402
+from prompt_forensics.metrics.similarity import embed_revision  # noqa: E402
 from prompt_forensics.scenarios import load_scenarios  # noqa: E402
 
 
@@ -89,6 +90,7 @@ def cmd_generate(args) -> None:
             "model": args.model, "backend": args.backend, "effort": args.effort,
             "max_tokens": args.max_tokens, "fallbacks": fallbacks,
             "embedding_model": get_settings().embed_model_name if not args.exact_only else None,
+            "embedding_revision": embed_revision() if not args.exact_only else None,
             "scenario_root": args.scenario_root,
         },
     )
