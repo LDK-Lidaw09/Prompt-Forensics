@@ -200,7 +200,8 @@ def judge_replay_similarity(baseline_output: str, replay_output: str, judge_mode
     base, new = baseline_output or "", replay_output or ""
     char_similarity = difflib.SequenceMatcher(None, base, new).ratio()
 
-    embedding_info: dict[str, Any] = {"model": get_settings().embed_model_name}
+    embedding_info: dict[str, Any] = {"model": get_settings().embed_model_name,
+                                      "revision": similarity.embed_revision()}
     try:
         raw_cosine = similarity.cosine_pair(base, new) if base.strip() and new.strip() else None
         embedding_similarity = (raw_cosine + 1.0) / 2.0 if raw_cosine is not None else None

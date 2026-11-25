@@ -57,7 +57,9 @@ python scripts/analyze.py replays --attacks results/robustness_attacks.csv \
 - Victim input: `system_prompt`, `dataset` excerpt and attack/safe prompt,
   joined by blank lines and sent as **one user message** (no system role).
 - Replay *i* (0-based) uses seed `1234 + i`.
-- Embeddings: `Alibaba-NLP/gte-large-en-v1.5`, batch size 1.
+- Embeddings: `Alibaba-NLP/gte-large-en-v1.5` at revision `104333d6af6f97649377c2afbde10a7704870c7b`
+  (`EMBED_MODEL_REVISION`; the Hub repository moved to another format on
+  2026-11-21 that transformers < 5 cannot load), batch size 1.
   BERTScore: `bert_score` default for English (`roberta-large`), no baseline
   rescaling.
 - `--cosine-mapping shifted` maps a cosine *c* to (c + 1) / 2, which is what

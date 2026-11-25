@@ -5,7 +5,8 @@ per process, the first time a metric is computed. Importing this module is
 cheap.
 
 - **Cosine similarity** uses sentence-transformers with
-  ``Alibaba-NLP/gte-large-en-v1.5`` (``EMBED_MODEL_NAME``). Embeddings are
+  ``Alibaba-NLP/gte-large-en-v1.5`` (``EMBED_MODEL_NAME``) at the revision
+  used for the thesis (``EMBED_MODEL_REVISION``). Embeddings are
   L2-normalised, so the cosine is a dot product, in [-1, 1].
 - **BERTScore** uses the ``bert_score`` library with its default backbone for
   English (``roberta-large``, layer 17), no IDF weighting and no baseline
@@ -20,6 +21,15 @@ from typing import Sequence
 
 from ..config import get_settings
 
+THESIS_EMBED_MODEL = "Alibaba-NLP/gte-large-en-v1.5"
+
+
+def embed_revision(model_name: str | None = None) -> str | None:
+    """Hub revision loaded for ``model_name`` (default: the configured model); None means latest."""
+    settings = get_settings()
+    name = model_name or settings.embed_model_name
+    return (settings.embed_model_revision or None) if name == THESIS_EMBED_MODEL else None
+
 
 @lru_cache(maxsize=2)
 def get_embedder(model_name: str | None = None, device: str | None = None):
@@ -27,8 +37,12 @@ def get_embedder(model_name: str | None = None, device: str | None = None):
     from sentence_transformers import SentenceTransformer
 
     settings = get_settings()
+    name = model_name or settings.embed_model_name
     return SentenceTransformer(
-        model_name or settings.embed_model_name,
+        name,
+        # The pinned revision belongs to the thesis model; any other model or a
+        # local folder is loaded as given.
+        revision=embed_revision(name),
         # gte-large-en-v1.5 ships custom modelling code on the Hugging Face Hub.
         trust_remote_code=True,
         device=device or settings.embed_device,
